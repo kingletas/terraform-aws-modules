@@ -1,0 +1,18 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+
+region      = "us-east-1"
+name        = "exchange"
+environment = "production"
+
+partners = {
+  acme = {
+    public_keys = ["ssh-ed25519 AAAAC3Nza... acme-integration"]
+    description = "Daily inventory file"
+  }
+
+  globex-readonly = {
+    public_keys = ["ssh-ed25519 AAAAC3Nza... globex-pull"]
+    read_only   = true
+    description = "Pulls our nightly export"
+  }
+}

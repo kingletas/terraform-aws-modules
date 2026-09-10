@@ -1,0 +1,92 @@
+# Checkov configuration for a module library.
+#
+# A module is not a deployment. Most of the skips below are checks that judge a
+# finished stack: whether a load balancer has a WAF, whether a volume is in a
+# backup plan, whether a variable the caller sets was set. A module cannot
+# answer any of those about itself, so those checks can never go quiet here.
+#
+# A check with no reachable silent case stops being a check and becomes
+# something people learn to scroll past. Each group below says why it cannot
+# pass, and every check not listed still runs.
+#
+# Only checks that cannot pass anywhere in a module library are listed here.
+# Anything true of one resource is skipped at that resource instead, with the
+# reason on the line above it, so it is read by whoever changes the code.
+#
+# A repository that *deploys* these modules should run checkov with none of
+# these skips. That is where they can be answered.
+
+framework:
+  - terraform
+compact: true
+quiet: true
+download-external-modules: false
+
+# Plan-test fixtures create bare resources only so a module can be handed IDs that
+# do not exist until apply. They are never deployed.
+skip-path:
+  - /tests/fixture/
+
+skip-check:
+  # --- The caller decides, and checkov cannot see across a module boundary ---
+  # Each of these is a variable on the module. Checkov resolves the declaration,
+  # not the value a caller passes, so it reads every one as unset.
+  - CKV_AWS_88   # EC2 public IP — associate_public_ip_address, default false
+  - CKV_AWS_91   # ELBv2 access logging — access_logs
+  - CKV_AWS_104  # DocumentDB audit logs — parameters, default enables audit
+  - CKV_AWS_118  # RDS enhanced monitoring — monitoring_interval, default 60
+  - CKV_AWS_119  # DynamoDB customer-managed key — kms_key_arn
+  - CKV_AWS_120  # API Gateway caching — a cost decision, not a security one
+  - CKV_AWS_129  # RDS log exports — enabled_cloudwatch_logs_exports
+  - CKV_AWS_164  # Transfer server public — endpoint_type
+  - CKV_AWS_224  # ECS exec logging with a customer key — kms_key_arn; the
+                 # module always creates the log group, it cannot invent a key
+  - CKV_AWS_225  # API Gateway method caching — as CKV_AWS_120
+  - CKV_AWS_226  # RDS minor upgrades — auto_minor_version_upgrade, default true
+  - CKV_AWS_272  # Lambda code signing — needs a signing profile the caller owns
+  - CKV_AWS_304  # Secret rotation — rotation, and it needs a rotation function
+  - CKV_AWS_317  # OpenSearch audit logs — log_publishing
+  - CKV_AWS_318  # OpenSearch dedicated masters — dedicated_master, a cost decision
+  - CKV_AWS_324  # RDS cluster log capture — enabled_cloudwatch_logs_exports
+  - CKV2_AWS_4   # API Gateway logging level — access logging is always on here
+  - CKV2_AWS_10  # CloudTrail to CloudWatch — cloudwatch_log_group_arn
+  - CKV2_AWS_27  # Aurora query logging — cluster_parameters
+  - CKV2_AWS_32  # CloudFront response headers policy — response_headers_policy_id
+  - CKV2_AWS_34  # SSM parameter encryption — the type is the caller's choice
+  - CKV2_AWS_51  # API Gateway client certificates — the caller's auth model
+  - CKV2_AWS_52  # OpenSearch fine-grained access — master_user or master_user_arn
+  - CKV2_AWS_53  # API Gateway request validation — belongs in the OpenAPI document
+  - CKV2_AWS_59  # OpenSearch dedicated master — as CKV_AWS_318
+
+  # --- A deployment concern no single module can satisfy ---
+  # These are true of a stack, not of a resource. Answering them means reaching
+  # into another module, which is exactly what a module must not do.
+  - CKV_AWS_144  # S3 cross-region replication — needs a second bucket and a role
+  - CKV_AWS_192  # WAF log4j rule — the rule set is a variable; the default carries it
+  - CKV2_AWS_5   # Security group attached — the group leaves as an output and
+                 # arrives through a variable; checkov's graph stops at the boundary
+  - CKV2_AWS_8   # RDS in a backup plan — the plan is a separate module
+  - CKV2_AWS_9   # EBS in a backup plan — as CKV2_AWS_8
+  - CKV2_AWS_18  # EFS in a backup plan — as CKV2_AWS_8
+  - CKV2_AWS_28  # ALB behind a WAF — web_acl_arn is attached by the caller
+  - CKV2_AWS_29  # API Gateway behind a WAF — as CKV2_AWS_28
+  - CKV2_AWS_47  # CloudFront WAF log4j rule — as CKV2_AWS_28
+  - CKV2_AWS_62  # S3 event notifications — not a security property
+
+  # --- Checkov is wrong about the design ---
+  - CKV_AWS_2    # "ALB protocol is HTTPS" — the HTTP listener exists to answer
+                 # port 80 with a 301 to HTTPS, which is the recommended shape
+  - CKV_AWS_103  # "Load balancer uses TLS 1.2" — flagged on the plain HTTP
+                 # listener above and on a TCP listener, neither of which has TLS
+  - CKV2_AWS_20  # "ALB redirects HTTP to HTTPS" — it does, via redirect_http_to_https
+  - CKV_AWS_109  # A KMS key policy's resource is always "*", which means this key
+  - CKV_AWS_111  # As CKV_AWS_109
+  - CKV_AWS_356  # As CKV_AWS_109
+
+  # --- Checkov is looking at the wrong resource ---
+  - CKV_AWS_260  # "No ingress from 0.0.0.0/0 to port 80" — the rule exists so
+                 # the load balancer can answer port 80 with a 301 to HTTPS
+  - CKV2_AWS_65  # "S3 ACLs disabled" — correct everywhere except a log-delivery
+                 # bucket. CloudFront and Redshift audit logging write with an
+                 # ACL and cannot deliver to a bucket where they are off, which
+                 # is why those two buckets exist separately at all

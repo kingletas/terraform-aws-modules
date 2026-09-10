@@ -1,0 +1,50 @@
+# Terraform state and working directories
+.terraform/
+# A child module must not pin its consumer's providers. Examples are root
+# modules and commit theirs.
+modules/*/.terraform.lock.hcl
+.terraform.tfstate.lock.info
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Variable files, which carry real values
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+# Plan output, which contains resolved secrets
+*.tfplan
+*.tfplan.json
+plan.json
+plan.out
+
+# Backend configuration pointing at real accounts
+backend.tf
+!backend.tf.example
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
+*.csr
+*.ovpn
+*.p12
+*.gpg
+pki/
+
+# Local scratch, ignored globally too
+local.d/
+
+
+# Editor and OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# The user-level ~/.gitignore is core.excludesFile for every repository under
+# $HOME and excludes *.sh outright. Without this negation the release workflow
+# fails on a script that was never pushed.
+!*.sh

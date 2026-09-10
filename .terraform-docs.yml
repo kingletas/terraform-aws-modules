@@ -1,0 +1,35 @@
+formatter: markdown table
+
+output:
+  file: README.md
+  mode: inject
+  template: |-
+    <!-- BEGIN_TF_DOCS -->
+    {{ .Content }}
+    <!-- END_TF_DOCS -->
+
+sections:
+  show:
+    - requirements
+    - providers
+    - inputs
+    - outputs
+    - resources
+
+# Declaration order, which each variables.tf chooses as a reading order: name
+# first, then the settings that matter most. Required-ness has its own column.
+sort:
+  enabled: false
+
+settings:
+  anchor: false
+  # Document the constraint a caller must satisfy, not whatever happens to be
+  # locked on the machine that ran it, which differs between laptop and CI.
+  lockfile: false
+  default: true
+  escape: true
+  hide-empty: true
+  indent: 3
+  required: true
+  sensitive: true
+  type: true
