@@ -4,6 +4,13 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- The README said `make check` ran five lanes and quoted an old checkov count. It now lists all six lanes, the `make plan-test` target and the current scan result.
+- `make help` said `make clean` removes the examples' lock files. It doesn't: it removes the modules' lock files, and the examples' stay committed.
+
 ## [0.1.0] - 2026-09-10
 
 The first release.

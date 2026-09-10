@@ -61,5 +61,5 @@ docs-check: ## Fail if a module README is out of step with its variables
 # --- housekeeping ---
 
 .PHONY: clean
-clean: ## Remove .terraform directories and lock files from examples
+clean: ## Remove .terraform directories and the modules' lock files
 	@$(ROOT_DIR)/scripts/clean.sh
