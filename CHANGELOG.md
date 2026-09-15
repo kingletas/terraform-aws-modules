@@ -6,6 +6,12 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **`organization`** builds an AWS Organization, its organizational units and its member accounts. Units nest two levels so every `for_each` key is known at plan, and a child is addressed as `parent/child` wherever a unit is named. `create_organization = false` adopts an organization that already exists.
+- **`organization-policy`** creates one organizational policy and attaches it to roots, units or accounts, keyed by a name so detaching one target leaves the others alone.
+- **Failure-path tests.** Both new modules test the direction that refuses as well as the direction that passes: an account in a unit that was never declared, policy types without the `ALL` feature set, an address that is not an email, content that is not JSON, and a target that is not an AWS identifier.
+
 ### Fixed
 
 - The README said `make check` ran five lanes and quoted an old checkov count. It now lists all six lanes, the `make plan-test` target and the current scan result.

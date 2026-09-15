@@ -3,7 +3,7 @@
 [![CI](https://github.com/kingletas/terraform-aws-modules/actions/workflows/ci.yml/badge.svg)](https://github.com/kingletas/terraform-aws-modules/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Fifty-two reusable Terraform modules for AWS, drawn from infrastructure I've actually run: networking, compute, data, storage, messaging, edge, identity and operations.
+Fifty-four reusable Terraform modules for AWS, drawn from infrastructure I've actually run: multi-account, networking, compute, data, storage, messaging, edge, identity and operations.
 
 Each module does one thing, and you compose them. Every input is typed, described and validated where it can be, and every collection is keyed by a name you choose rather than by list position. The `examples/` directory holds working compositions you can apply as they are.
 
@@ -11,6 +11,9 @@ Each module does one thing, and you compose them. Every input is typed, describe
 
 | Module | What it builds |
 |---|---|
+| **Multi-account** | |
+| [`organization`](modules/organization) | The organization, its units, and the member accounts inside them |
+| [`organization-policy`](modules/organization-policy) | A service control policy and everything it attaches to |
 | **Conventions** | |
 | [`context`](modules/context) | Names, tags and every environment-dependent default, in one place |
 | [`account-defaults`](modules/account-defaults) | Account-wide settings above per-resource ones: EBS encryption, S3 public access, password policy |
