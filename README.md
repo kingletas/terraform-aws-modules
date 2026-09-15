@@ -3,7 +3,7 @@
 [![CI](https://github.com/kingletas/terraform-aws-modules/actions/workflows/ci.yml/badge.svg)](https://github.com/kingletas/terraform-aws-modules/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Fifty-four reusable Terraform modules for AWS, drawn from infrastructure I've actually run: multi-account, networking, compute, data, storage, messaging, edge, identity and operations.
+Fifty-five reusable Terraform modules for AWS, drawn from infrastructure I've actually run: multi-account, networking, compute, data, storage, messaging, edge, identity and operations.
 
 Each module does one thing, and you compose them. Every input is typed, described and validated where it can be, and every collection is keyed by a name you choose rather than by list position. The `examples/` directory holds working compositions you can apply as they are.
 
@@ -64,6 +64,7 @@ Each module does one thing, and you compose them. Every input is typed, describe
 | [`waf-web-acl`](modules/waf-web-acl) | Managed rule groups, rate limits and IP lists |
 | **Identity and secrets** | |
 | [`iam-role`](modules/iam-role) | Service, cross-account and OIDC trust, in one place |
+| [`iam-oidc-provider`](modules/iam-oidc-provider) | An OIDC issuer IAM will accept, so CI needs no stored key |
 | [`kms-key`](modules/kms-key) | A key with rotation and a policy built from named principals |
 | [`secrets-manager-secret`](modules/secrets-manager-secret) | A secret, optionally generated, optionally rotated |
 | [`ssm-parameter`](modules/ssm-parameter) | Parameters as a set, with values kept separately sensitive |
