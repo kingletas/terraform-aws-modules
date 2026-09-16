@@ -39,8 +39,8 @@ graph TB
 
 ## Before you deploy
 
-- A public Route 53 hosted zone for the domain, in the same account. The certificate is validated through it.
 - AWS credentials for the target account, and Terraform 1.9 or later.
+- A public Route 53 hosted zone for the domain, in the same account. The certificate is validated through it.
 - A build that can push images. The repositories are created by this apply, so the services cannot start until an image with the configured tag is pushed to each one. ECS keeps retrying until it appears.
 
 ## How to use it
@@ -55,13 +55,13 @@ terraform apply -var domain_name=app.example.com -var hosted_zone_name=example.c
 
 Then push each service's image to the URL in `terraform output repository_urls`, tagged with its `image_tag`.
 
-To run the plan test against mock providers, without credentials:
+To check the example without AWS credentials, run its plan test from the top of the repository. It plans against mock providers and creates nothing:
 
 ```bash
-terraform test
+make test DIR=examples/container-platform
 ```
 
-The example's `.tf` files call modules with relative paths (`../../modules/<name>`). A copy used outside this repository should switch each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.3.0`.
+The `.tf` files call modules by relative path (`../../modules/<name>`). If you copy this example outside this repository, change each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.3.0`.
 
 ### Add a service
 
@@ -116,9 +116,7 @@ In practice that belongs in a `.tfvars` file the pipeline writes. **Terraform is
 | `untagged_image_expiry_days` | `7` | Days before an untagged image expires |
 | `alert_email` | `null` | Email subscribed to alarms; the subscription must be confirmed from the inbox |
 
-## Design notes
-
-### Two IAM roles, not one
+## Two IAM roles, not one
 
 **`execution_role`** is what ECS itself uses, *before your code runs*, to pull the image and read the secrets named in the task definition. **`task_role`** is what the application assumes at runtime.
 
@@ -126,25 +124,25 @@ Collapsing them into one is a common shortcut, and it means a compromise of the 
 
 A missing execution role is also a common first failure, and it is hard to spot: the task never starts, and the reason is in the stopped-task detail rather than in any log.
 
-### Tags are immutable, and that is a build change
+## Tags are immutable, and that is a build change
 
 `v1.4.2` names one image forever. A build cannot move it, so what is deployed always matches what that tag meant when it shipped.
 
 This means **a build cannot overwrite `latest`**. A pipeline that pushes `latest` on every merge has to push an immutable build tag and deploy that instead.
 
-### The image pull needs three VPC endpoints, not one
+## The image pull needs three VPC endpoints, not one
 
 `ecr.api` for the registry API, `ecr.dkr` for the Docker protocol, and **the S3 gateway endpoint, because the image layers live in S3**.
 
 Configure two of the three and pulls hang until they time out, with an error that names ECR and does not mention S3. The S3 gateway endpoint is free.
 
-### The circuit breaker is what makes a bad deploy survivable
+## The circuit breaker is what makes a bad deploy survivable
 
 Without it, a rolling deployment of an image that cannot start replaces every healthy task with one that crashes, and keeps going until the service is fully down.
 
 `circuit_breaker` stops the deployment when failures pile up, and `rollback_on_failure` puts the previous task definition back.
 
-### Spot above an on-demand floor
+## Spot above an on-demand floor
 
 Each service keeps one task on on-demand Fargate (`base = 1`) and places the rest three in four on Fargate Spot. Fargate Spot costs up to 70% less and can be reclaimed with two minutes' notice. The on-demand task keeps a service answering while its Spot tasks are replaced, which suits stateless request handling and not a job that cannot be interrupted.
 

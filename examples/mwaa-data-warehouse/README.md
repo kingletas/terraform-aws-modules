@@ -37,6 +37,7 @@ graph LR
 
 ## Before you deploy
 
+- AWS credentials for the target account, and Terraform 1.9 or later.
 - **DMS account-level roles.** DMS needs `dms-vpc-role` and `dms-cloudwatch-logs-role` once per account, and the Redshift target needs `dms-access-for-endpoint`. The example creates all three. Set `create_dms_service_roles = false` where the first two exist, and `create_dms_endpoint_access_role = false` where `dms-access-for-endpoint` exists. The console creates it with any Redshift endpoint.
 - **Network reach to the sources.** DMS connects out from the addresses in the `replication_instance_ips` output. Each source system's firewall has to allow them.
 - **A way into the VPC** if you want the Airflow UI, which is private. A VPN or a bastion works; see the `client-vpn-cert-auth` example.
@@ -58,10 +59,10 @@ terraform plan
 terraform apply
 ```
 
-To check the example without AWS credentials, run the plan test. It plans against mock providers and creates nothing:
+To check the example without AWS credentials, run its plan test from the top of the repository. It plans against mock providers and creates nothing:
 
 ```bash
-terraform test
+make test DIR=examples/mwaa-data-warehouse
 ```
 
 The `.tf` files call modules by relative path (`../../modules/<name>`). If you copy this example outside this repository, change each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.3.0`.

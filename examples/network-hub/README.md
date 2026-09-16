@@ -30,7 +30,7 @@ graph TB
 - A shared services VPC across two zones, with a NAT gateway per zone.
 - One VPC per entry in `spokes` (`production` and `staging` by default), with no NAT gateway unless the spoke asks for one.
 - A transit gateway with two route tables, `hub` and `spokes`, and the VPC routes that point at it.
-- Seven interface endpoints and the S3 and DynamoDB gateway endpoints in the shared VPC.
+- Seven interface endpoints and the S3 and DynamoDB gateway endpoints in the shared VPC, and a Route 53 private hosted zone per interface endpoint so every VPC resolves it by name.
 - When `on_premises` is set: a site-to-site VPN attached to the transit gateway, logging to a CloudWatch log group kept for 365 days.
 
 ## Before you deploy
@@ -59,13 +59,13 @@ on_premises = {
 
 `routes` is required even with BGP. The VPC route tables are written from it, and routes learned by BGP are not known at plan time.
 
-To run the plan tests against mock providers, without credentials:
+To check the example without AWS credentials, run its plan test from the top of the repository. It plans against mock providers and creates nothing:
 
 ```bash
-terraform test
+make test DIR=examples/network-hub
 ```
 
-The example's `.tf` files call modules with relative paths (`../../modules/<name>`). A copy used outside this repository should switch each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.3.0`.
+The `.tf` files call modules by relative path (`../../modules/<name>`). If you copy this example outside this repository, change each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.3.0`.
 
 The `vpn_configuration` output holds the device configuration, including pre-shared keys. It is marked sensitive; read it with `terraform output -raw vpn_configuration` and hand it over out of band.
 
@@ -104,11 +104,11 @@ A NAT gateway is roughly $32 a month plus data, **per zone**. Three spokes acros
 
 Here the spokes route `0.0.0.0/0` to the transit gateway, the hub's NAT gateways do the work, and everything egresses from **one set of addresses**. That set is also the allow-list you hand a partner, from `nat_public_ips`.
 
-The trade is real: transit gateway data processing is charged on top of NAT data processing, so traffic crossing the gateway is billed twice. At low egress volume the saved NAT gateways win. At high volume, per-spoke NAT is cheaper, which is what `enable_nat_gateway` on a spoke is for. A spoke with its own NAT gateway still gets explicit routes to on-premises through the transit gateway.
+The trade is real: transit gateway data processing is charged on top of NAT data processing, so traffic crossing the gateway is billed twice. At low egress volume the saved NAT gateways win. At high volume, per-spoke NAT is cheaper, which is what `enable_nat_gateway` on a spoke is for. A spoke with its own NAT gateway still gets explicit routes to the shared VPC and to on-premises through the transit gateway.
 
 ## Attachments do not create routes
 
-A transit gateway attachment reports `available` and carries nothing until the **VPC** route tables point at it. This example writes those routes explicitly: shared private and public tables to each spoke, spoke private tables to `0.0.0.0/0`, and every private table to the on-premises ranges.
+A transit gateway attachment reports `available` and carries nothing until the **VPC** route tables point at it. This example writes those routes explicitly: shared private and public tables to each spoke, spoke private tables to `0.0.0.0/0` (or to the shared VPC, for a spoke with its own NAT gateway), and every private table to the on-premises ranges.
 
 Three layers all have to agree:
 
@@ -116,13 +116,13 @@ Three layers all have to agree:
 2. The VPC subnet route tables, pointing at the gateway.
 3. Security groups on both ends, allowing the other's CIDR.
 
-## Endpoints are centralised, and private DNS is off
+## Endpoints are centralised, and resolved by private hosted zones
 
 Interface endpoints are billed hourly per availability zone. Seven services in three VPCs across two zones is 42 hourly charges; in the hub alone it is 14. The endpoint security group allows HTTPS from the shared VPC and every spoke.
 
-`private_dns_enabled = false` is deliberate. With private DNS on, the endpoint's name resolves **only inside the hub VPC**, which defeats the sharing. Making a centralised endpoint usable by name from a spoke needs a Route 53 private hosted zone per service, associated with every VPC, and this example does not create those.
+With private DNS on, an endpoint's name resolves **only inside the hub VPC**, which defeats the sharing. So `private_dns_enabled = false`, and the example creates one Route 53 private hosted zone per service instead, named as the service's public hostname (`ssm.us-east-1.amazonaws.com`, `api.ecr.us-east-1.amazonaws.com`). Each zone holds an alias record at its apex and a wildcard, both pointing at the endpoint, and is associated with the hub and every spoke. A spoke calling Systems Manager by its usual name reaches the hub's endpoint across the transit gateway, with no code change.
 
-Without them, a spoke reaches these services through the hub's NAT gateways as normal. The endpoints serve the hub's own traffic.
+A dotted short name is reversed to build the hostname: `ecr.api` becomes `api.ecr.<region>.amazonaws.com`. Check that holds for any service you add to `interface_endpoint_services`.
 
 ## CIDRs must not overlap
 
@@ -140,13 +140,14 @@ Approximate list prices per month.
 | Transit gateway data processing | `██░░░░░░░░` $0.02/GB |
 | NAT gateways in the hub, 2 zones | `████░░░░░░` $65 + data |
 | Interface endpoints, 7 × 2 zones | `██████░░░░` $100 |
+| Private hosted zones for the endpoints, 7 × $0.50 | `░░░░░░░░░░` $3.50 + queries |
 | Site-to-site VPN, plus its own attachment | `████░░░░░░` $72 + data |
 
 **The attachments and the endpoints are the two lines to watch**, and both scale with how many things you connect rather than with traffic. A hub with two spokes and seven endpoints costs about $270 a month before a byte moves. The S3 and DynamoDB gateway endpoints are free.
 
 ## Limits
 
-- **No Route 53 private hosted zones or resolver rules**, so the centralised endpoints are not reachable by name from a spoke.
+- **No Route 53 resolver rules.** The endpoint zones answer inside these VPCs only; on-premises clients do not resolve the endpoints by name.
 - **No network firewall.** Spoke-to-spoke is blocked by routing. Inspecting traffic that *is* allowed needs AWS Network Firewall and an appliance-mode attachment.
 - **Single account.** The `transit-gateway` module can share the gateway with other accounts through `share_with_principals`; this example does not.
 - **No spoke-to-spoke exception.** Where two spokes must talk, add a third route table rather than relaxing these two.

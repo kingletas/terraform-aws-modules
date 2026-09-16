@@ -29,7 +29,23 @@ run "plans_with_real_values" {
   }
 
   variables {
-    domain_name      = "www.example.com"
-    hosted_zone_name = "example.com"
+    domain_name        = "www.example.com"
+    hosted_zone_name   = "example.com"
+    additional_domains = ["example.com"]
+  }
+
+  assert {
+    condition     = toset(keys(aws_route53_record.site)) == toset(["www.example.com", "example.com"])
+    error_message = "Every domain the distribution answers for must get an alias record."
+  }
+
+  assert {
+    condition     = toset(flatten([for principal in data.aws_iam_policy_document.content.statement[0].principals : principal.identifiers])) == toset(["cloudfront.amazonaws.com"]) && data.aws_iam_policy_document.content.statement[0].actions == toset(["s3:GetObject"])
+    error_message = "The content bucket must let CloudFront read objects and do nothing else."
+  }
+
+  assert {
+    condition     = one([for condition in data.aws_iam_policy_document.content.statement[0].condition : condition.variable]) == "AWS:SourceArn"
+    error_message = "CloudFront's read must be limited to this distribution by AWS:SourceArn, or any distribution could serve the bucket."
   }
 }

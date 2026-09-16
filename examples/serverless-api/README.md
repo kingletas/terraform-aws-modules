@@ -33,9 +33,9 @@ graph LR
 
 ## Before you deploy
 
+- AWS credentials for the target account, and Terraform 1.9 or later.
 - **Deployment archives in S3.** `lambda_bucket` has no default, and the archive keys in `functions` must exist in it. The example does not build or upload function code.
 - **The API Gateway CloudWatch role for the account.** Stage access logging needs it, and it is one setting per account and region. In an account where nothing has set it, apply with `-var="manage_api_gateway_account_role=true"`. Where something else already manages it, leave it off so the two do not fight.
-- AWS credentials for the target account, and Terraform 1.9 or later.
 
 ## How to use it
 
@@ -53,13 +53,13 @@ terraform apply -var="lambda_bucket=my-artifacts" -var='functions={create-order=
 
 **Terraform does not notice a changed archive at the same key.** Version the key, as above, or pass `source_code_hash`. Overwriting `v1.0.0.zip` and re-applying does nothing and reports success.
 
-To run the plan tests against mock providers, without credentials:
+To check the example without AWS credentials, run its plan test from the top of the repository. It plans against mock providers and creates nothing:
 
 ```bash
-terraform test
+make test DIR=examples/serverless-api
 ```
 
-The example's `.tf` files call modules with relative paths (`../../modules/<name>`). A copy used outside this repository should switch each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.3.0`.
+The `.tf` files call modules by relative path (`../../modules/<name>`). If you copy this example outside this repository, change each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.3.0`.
 
 ## Inputs worth knowing
 

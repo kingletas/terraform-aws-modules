@@ -177,13 +177,30 @@ module "media" {
 locals {
   static_assets_bucket = format("%s-static-%s", local.prefix, data.aws_caller_identity.current.account_id)
   cdn_logs_bucket      = format("%s-cdn-logs-%s", local.prefix, data.aws_caller_identity.current.account_id)
+
+  static_assets_kms_key_arn = null
+
+  # Regions opened before August 2022 deliver load balancer logs from a regional ELB account; later ones only from the service principal.
+  elb_account_regions = [
+    "us-east-1", "us-east-2", "us-west-1", "us-west-2",
+    "af-south-1", "ap-east-1", "ap-south-1", "ap-northeast-1", "ap-northeast-2", "ap-northeast-3",
+    "ap-southeast-1", "ap-southeast-2", "ap-southeast-3", "ca-central-1",
+    "eu-central-1", "eu-west-1", "eu-west-2", "eu-west-3", "eu-south-1", "eu-north-1",
+    "me-south-1", "sa-east-1", "us-gov-east-1", "us-gov-west-1", "cn-north-1", "cn-northwest-1",
+  ]
+}
+
+data "aws_elb_service_account" "current" {
+  count = contains(local.elb_account_regions, var.region) ? 1 : 0
 }
 
 module "static_assets" {
   source = "../../modules/s3-bucket"
 
-  name        = local.static_assets_bucket
-  kms_key_arn = module.kms.arn
+  name = local.static_assets_bucket
+
+  # SSE-S3, because every object here is public through CloudFront and a customer key would need to trust CloudFront to decrypt.
+  kms_key_arn = local.static_assets_kms_key_arn
 
   policy_documents = [data.aws_iam_policy_document.static.json]
 
@@ -217,19 +234,39 @@ module "cdn_logs" {
   tags = local.tags
 }
 
-# Load balancer access logs, written only under this account's prefix.
+# Load balancer access logs, written only under this account's prefix, by whichever principal the region delivers from.
 data "aws_iam_policy_document" "alb_logs" {
   statement {
     sid       = "AllowLoadBalancerLogDelivery"
     effect    = "Allow"
     actions   = ["s3:PutObject"]
-    resources = [format("arn:%s:s3:::%s/alb/AWSLogs/%s/*", data.aws_partition.current.partition, local.cdn_logs_bucket, data.aws_caller_identity.current.account_id)]
+    resources = [local.alb_log_objects]
 
     principals {
       type        = "Service"
       identifiers = ["logdelivery.elasticloadbalancing.amazonaws.com"]
     }
   }
+
+  dynamic "statement" {
+    for_each = data.aws_elb_service_account.current
+
+    content {
+      sid       = "AllowRegionalLoadBalancerAccountLogDelivery"
+      effect    = "Allow"
+      actions   = ["s3:PutObject"]
+      resources = [local.alb_log_objects]
+
+      principals {
+        type        = "AWS"
+        identifiers = [statement.value.arn]
+      }
+    }
+  }
+}
+
+locals {
+  alb_log_objects = format("arn:%s:s3:::%s/alb/AWSLogs/%s/*", data.aws_partition.current.partition, local.cdn_logs_bucket, data.aws_caller_identity.current.account_id)
 }
 
 # The Systems Manager connection moves every Ansible module through a bucket.

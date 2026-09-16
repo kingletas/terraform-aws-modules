@@ -17,7 +17,7 @@ It is the smallest way to get inside a private subnet, and it suits a developmen
 
 You need:
 
-- Terraform 1.9 or later, and AWS credentials for the target account.
+- AWS credentials for the target account, and Terraform 1.9 or later.
 - The AWS CLI, to export the client configuration after apply.
 - [easy-rsa](https://github.com/OpenVPN/easy-rsa) 3, to create the certificate authority and certificates.
 - An OpenVPN-compatible client: the AWS VPN Client, OpenVPN or Tunnelblick.
@@ -106,10 +106,10 @@ terraform plan
 terraform apply
 ```
 
-To check the example without AWS credentials, run the plan test. It plans against mock providers with placeholder certificates and creates nothing:
+To check the example without AWS credentials, run its plan test from the top of the repository. It plans against mock providers with placeholder certificates and creates nothing:
 
 ```bash
-terraform test
+make test DIR=examples/client-vpn-cert-auth
 ```
 
 The `.tf` files call modules by relative path (`../../modules/<name>`). If you copy this example outside this repository, change each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.3.0`.

@@ -2,7 +2,7 @@ module "node_role" {
   source = "../../modules/iam-role"
 
   name             = format("%s-node", local.prefix)
-  description      = "Every node running Magento"
+  description      = "Web, cron and admin nodes, which read static assets but never publish them"
   trusted_services = ["ec2.amazonaws.com"]
 
   managed_policy_arns = {
@@ -51,17 +51,43 @@ data "aws_iam_policy_document" "node" {
   }
 
   statement {
-    sid       = "AnsibleTransfer"
+    sid       = "ReadStaticAssets"
     effect    = "Allow"
-    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
-    resources = [format("%s/*", module.ansible_transfer.arn)]
+    actions   = ["s3:GetObject", "s3:ListBucket"]
+    resources = [module.static_assets.arn, format("%s/*", module.static_assets.arn)]
+  }
+}
+
+# Only the builder publishes what CloudFront serves to every shopper, so a compromised web node cannot plant a script there.
+module "builder_role" {
+  count  = var.include_builder ? 1 : 0
+  source = "../../modules/iam-role"
+
+  name             = format("%s-builder", local.prefix)
+  description      = "The builder node, which also publishes static assets"
+  trusted_services = ["ec2.amazonaws.com"]
+
+  managed_policy_arns = {
+    session_manager  = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+    cloudwatch_agent = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
   }
 
+  inline_policies = {
+    storefront     = data.aws_iam_policy_document.node.json
+    publish_static = data.aws_iam_policy_document.publish_static.json
+  }
+
+  create_instance_profile = true
+
+  tags = local.tags
+}
+
+data "aws_iam_policy_document" "publish_static" {
   statement {
-    sid       = "StaticAssets"
+    sid       = "PublishStaticAssets"
     effect    = "Allow"
-    actions   = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
-    resources = [module.static_assets.arn, format("%s/*", module.static_assets.arn)]
+    actions   = ["s3:PutObject", "s3:DeleteObject"]
+    resources = [format("%s/*", module.static_assets.arn)]
   }
 }
 
@@ -216,6 +242,7 @@ module "singletons" {
     var.include_builder ? {
       builder = {
         count                  = 1
+        iam_instance_profile   = one(module.builder_role[*].instance_profile_name)
         instance_type          = "c7g.2xlarge"
         root_volume_size       = 200
         root_volume_throughput = 500

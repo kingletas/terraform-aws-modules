@@ -28,8 +28,8 @@ graph LR
 
 ## Before you deploy
 
+- AWS credentials for the target account, and Terraform 1.9 or later.
 - A public Route 53 hosted zone for the domain, in the same account. The example looks it up by `hosted_zone_name` and writes the validation and alias records into it.
-- AWS credentials for that account, and Terraform 1.9 or later.
 
 ## How to use it
 
@@ -41,13 +41,13 @@ terraform plan -var domain_name=www.example.com -var hosted_zone_name=example.co
 terraform apply -var domain_name=www.example.com -var hosted_zone_name=example.com
 ```
 
-To run the plan test against mock providers, without credentials:
+To check the example without AWS credentials, run its plan test from the top of the repository. It plans against mock providers and creates nothing:
 
 ```bash
-terraform test
+make test DIR=examples/static-site-cdn
 ```
 
-The example's `.tf` files call modules with relative paths (`../../modules/<name>`). A copy used outside this repository should switch each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.3.0`.
+The `.tf` files call modules by relative path (`../../modules/<name>`). If you copy this example outside this repository, change each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.3.0`.
 
 ### Deploy content
 

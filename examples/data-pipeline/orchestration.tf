@@ -331,6 +331,25 @@ module "alerts" {
   tags = local.tags
 }
 
+# A pipeline that did not run looks exactly like a pipeline with nothing to
+# do. treat_missing_data = breaching is what tells the two apart.
+locals {
+  # Every one of 24 hourly datapoints must be empty, which is the longest window CloudWatch allows.
+  extract_did_not_run_alarm = {
+    description         = "No extraction started in the last 24 hours"
+    metric_name         = "ExecutionsStarted"
+    namespace           = "AWS/States"
+    statistic           = "Sum"
+    comparison_operator = "LessThanThreshold"
+    threshold           = 1
+    period              = 3600
+    evaluation_periods  = 24
+    datapoints_to_alarm = 24
+    treat_missing_data  = "breaching"
+    dimensions          = { StateMachineArn = module.extract.arn }
+  }
+}
+
 module "alarms" {
   source = "../../modules/cloudwatch-alarm"
 
@@ -362,20 +381,7 @@ module "alarms" {
       dimensions          = { StateMachineArn = module.transform.arn }
     }
 
-    # A pipeline that did not run looks exactly like a pipeline with nothing to
-    # do. treat_missing_data = breaching is what tells the two apart.
-    "${local.prefix}-extract-did-not-run" = {
-      description         = "No extraction started in the last 26 hours"
-      metric_name         = "ExecutionsStarted"
-      namespace           = "AWS/States"
-      statistic           = "Sum"
-      comparison_operator = "LessThanThreshold"
-      threshold           = 1
-      evaluation_periods  = 1
-      period              = 93600
-      treat_missing_data  = "breaching"
-      dimensions          = { StateMachineArn = module.extract.arn }
-    }
+    "${local.prefix}-extract-did-not-run" = local.extract_did_not_run_alarm
 
     "${local.prefix}-missed-schedule" = {
       description         = "EventBridge could not deliver a scheduled run"

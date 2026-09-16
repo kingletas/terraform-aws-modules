@@ -38,6 +38,11 @@ run "plans_with_real_values" {
   }
 
   assert {
+    condition     = length(aws_route.spoke_to_shared) == 0
+    error_message = "A spoke egressing through the hub reaches the shared VPC by its default route and needs no extra one."
+  }
+
+  assert {
     condition     = keys(local.on_premises_route_tables) == ["hub", "spokes"]
     error_message = "On-premises routes must reach both the hub and spokes tables."
   }
@@ -45,6 +50,26 @@ run "plans_with_real_values" {
   assert {
     condition     = sort([for route in aws_route.shared_to_on_premises : route.destination_cidr_block]) == tolist(["192.168.0.0/16", "192.168.0.0/16"])
     error_message = "Each shared private route table must route the on-premises range to the transit gateway."
+  }
+
+  assert {
+    condition     = local.on_premises_association_table == "hub" && keys(local.on_premises_static_route_tables) == tolist(["hub", "spokes"]) && length(local.on_premises_propagation_tables) == 0
+    error_message = "With static routing, the VPN must associate with the hub table and add static routes to both tables, propagating to none."
+  }
+
+  assert {
+    condition     = local.endpoint_zone_names["ssm"] == "ssm.us-east-1.amazonaws.com" && local.endpoint_zone_names["ecr.api"] == "api.ecr.us-east-1.amazonaws.com" && local.endpoint_zone_names["ecr.dkr"] == "dkr.ecr.us-east-1.amazonaws.com"
+    error_message = "Each endpoint zone must carry the service's public hostname, with a dotted short name reversed."
+  }
+
+  assert {
+    condition     = toset(keys(module.endpoint_zones)) == toset(var.interface_endpoint_services) && module.endpoint_zones["logs"].name == "logs.us-east-1.amazonaws.com"
+    error_message = "Every interface endpoint service must get its own private hosted zone."
+  }
+
+  assert {
+    condition     = keys(local.endpoint_zone_vpc_ids) == ["production", "shared", "staging"]
+    error_message = "The endpoint zones must be associated with the shared VPC and every spoke."
   }
 }
 
@@ -58,6 +83,11 @@ run "bgp_still_routes_declared_ranges_from_the_vpcs" {
   assert {
     condition     = sort([for route in aws_route.shared_to_on_premises : route.destination_cidr_block]) == tolist(["192.168.0.0/16", "192.168.0.0/16"])
     error_message = "With BGP, each shared private route table must still route the declared on-premises range to the transit gateway."
+  }
+
+  assert {
+    condition     = local.on_premises_association_table == "hub" && keys(local.on_premises_propagation_tables) == tolist(["hub", "spokes"]) && length(local.on_premises_static_route_tables) == 0
+    error_message = "With BGP, the VPN must associate with the hub table and propagate to both tables, adding no static routes."
   }
 }
 
@@ -89,5 +119,10 @@ run "spokes_with_their_own_nat_skip_hub_egress" {
   assert {
     condition     = length(aws_route.spoke_to_on_premises) == 2
     error_message = "A spoke with its own NAT gateway needs an explicit route to on-premises in each private table."
+  }
+
+  assert {
+    condition     = [for route in aws_route.spoke_to_shared : route.destination_cidr_block] == ["10.0.0.0/16", "10.0.0.0/16"]
+    error_message = "A spoke with its own NAT gateway needs an explicit route to the shared VPC in each private table, or shared traffic leaves through its NAT."
   }
 }

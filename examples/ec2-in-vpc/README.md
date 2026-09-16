@@ -24,13 +24,13 @@ terraform plan
 terraform apply
 ```
 
-To run the plan test against mock providers, without credentials:
+To check the example without AWS credentials, run its plan test from the top of the repository. It plans against mock providers and creates nothing:
 
 ```bash
-terraform test
+make test DIR=examples/ec2-in-vpc
 ```
 
-The example's `.tf` files call modules with relative paths (`../../modules/<name>`). A copy used outside this repository should switch each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.3.0`.
+The `.tf` files call modules by relative path (`../../modules/<name>`). If you copy this example outside this repository, change each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.3.0`.
 
 ### Get a shell
 

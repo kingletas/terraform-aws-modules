@@ -34,6 +34,7 @@ graph LR
 
 ## Before you deploy
 
+- AWS credentials for the target account, and Terraform 1.9 or later.
 - **An organization trail needs the management account.** `is_organization_trail = true` is only valid there. See [Limits](#limits) for the bucket policy it also needs.
 - **Decide on Vault Lock before you turn it on.** Read the warning under [Backups select by tag](#backups-select-by-tag).
 
@@ -55,10 +56,10 @@ terraform apply
 
 If you set `alert_email`, confirm the subscription from the email AWS sends, or no alarm reaches you.
 
-To check the example without AWS credentials, run the plan test. It plans against mock providers and creates nothing:
+To check the example without AWS credentials, run its plan test from the top of the repository. It plans against mock providers and creates nothing:
 
 ```bash
-terraform test
+make test DIR=examples/account-baseline
 ```
 
 The `.tf` files call modules by relative path (`../../modules/<name>`). If you copy this example outside this repository, change each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.3.0`.
@@ -128,7 +129,9 @@ Three tiers, all at 05:00 UTC:
 | `weekly` | Sundays | 30 days | 365 days |
 | `monthly` | the 1st | 90 days | 2,555 days (about seven years) |
 
-> [!warning] Vault Lock is permanent
+> [!WARNING]
+> **Vault Lock is permanent**
+>
 > `enable_vault_lock = true` puts the vault in **compliance mode**, with a minimum retention of 7 days and a maximum of 2,555. After the 3-day `changeable_for_days` window, recovery points cannot be deleted early **by anyone, including the account root and AWS Support**, and the lock cannot be removed.
 >
 > That is right for a legal retention requirement and an expensive permanent mistake anywhere else: you cannot delete the data, and you cannot stop paying to store it. Read the AWS Backup Vault Lock documentation before setting it, and try it in a test account first.

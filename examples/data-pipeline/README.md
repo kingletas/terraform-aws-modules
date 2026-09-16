@@ -42,6 +42,7 @@ graph LR
 
 ## Before you deploy
 
+- AWS credentials for the target account, and Terraform 1.9 or later.
 - **A list of sources.** `sources` is empty by default, so the extract run has nothing to iterate over and no secrets are created until you add entries.
 - **Network reach to the sources.** Jobs in the private subnets reach sources outside the VPC through the NAT gateway. Each source's firewall has to allow the NAT gateway's public address, or you add your own route to the sources.
 
@@ -75,10 +76,10 @@ terraform plan
 terraform apply
 ```
 
-To check the example without AWS credentials, run the plan test. It plans against mock providers and creates nothing:
+To check the example without AWS credentials, run its plan test from the top of the repository. It plans against mock providers and creates nothing:
 
 ```bash
-terraform test
+make test DIR=examples/data-pipeline
 ```
 
 The `.tf` files call modules by relative path (`../../modules/<name>`). If you copy this example outside this repository, change each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.3.0`.
@@ -107,11 +108,13 @@ Both produce no data and no errors. The difference is invisible in a dashboard, 
 metric_name         = "ExecutionsStarted"
 comparison_operator = "LessThanThreshold"
 threshold           = 1
-period              = 93600
+period              = 3600
+evaluation_periods  = 24
+datapoints_to_alarm = 24
 treat_missing_data  = "breaching"
 ```
 
-**`treat_missing_data = "breaching"` is what makes this work.** No datapoint means no execution started, which is the condition being alarmed on. With the default `missing`, this alarm would sit in `INSUFFICIENT_DATA` forever and never fire. The period is 26 hours, so a run that starts a little late does not trip it.
+**`treat_missing_data = "breaching"` is what makes this work.** No datapoint means no execution started, which is the condition being alarmed on. With the default `missing`, this alarm would sit in `INSUFFICIENT_DATA` forever and never fire. It fires once 24 consecutive hours pass with no execution started, which is the longest window CloudWatch allows (period times evaluation periods cannot exceed a day), so a run that slips into a later hour than the day before trips it.
 
 ### A schedule can fail to fire at all
 

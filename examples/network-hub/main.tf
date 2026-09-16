@@ -38,6 +38,26 @@ locals {
     spokes = module.transit.route_table_ids["spokes"]
   }
 
+  # On-premises replies look up the hub table, which has learned the shared VPC and every spoke.
+  on_premises_association_table = "hub"
+
+  # The far side's ranges reach both tables, by BGP propagation or by static route.
+  on_premises_static_routes_only  = try(var.on_premises.static_routes_only, false)
+  on_premises_propagation_tables  = local.on_premises_static_routes_only ? {} : local.on_premises_route_tables
+  on_premises_static_route_tables = local.on_premises_static_routes_only ? local.on_premises_route_tables : {}
+
+  # A dotted short name such as ecr.api is served at api.ecr.<region>.amazonaws.com.
+  endpoint_zone_names = {
+    for service in var.interface_endpoint_services :
+    service => format("%s.%s.amazonaws.com", join(".", reverse(split(".", service))), var.region)
+  }
+
+  # Every VPC that resolves the hub's interface endpoints by their public service names.
+  endpoint_zone_vpc_ids = merge(
+    { shared = module.shared_vpc.vpc_id },
+    { for name, vpc in module.spoke_vpcs : name => vpc.vpc_id },
+  )
+
   tags = {
     Environment = var.environment
     Network     = var.name
@@ -214,6 +234,26 @@ resource "aws_route" "spoke_to_on_premises" {
   depends_on = [module.transit]
 }
 
+# A spoke with its own NAT gateway defaults to it, so the shared VPC needs an explicit route.
+resource "aws_route" "spoke_to_shared" {
+  for_each = {
+    for pair in flatten([
+      for name, spoke in var.spokes : [
+        for zone, table_id in module.spoke_vpcs[name].private_route_table_ids : {
+          key            = format("%s-%s", name, zone)
+          route_table_id = table_id
+        }
+      ] if spoke.enable_nat_gateway
+    ]) : pair.key => pair
+  }
+
+  route_table_id         = each.value.route_table_id
+  destination_cidr_block = var.shared_vpc_cidr
+  transit_gateway_id     = module.transit.id
+
+  depends_on = [module.transit]
+}
+
 # --- centralised endpoints ---
 
 module "endpoint_sg" {
@@ -249,9 +289,37 @@ module "endpoints" {
   interface_services = var.interface_endpoint_services
   gateway_services   = ["s3", "dynamodb"]
 
-  # Private DNS is disabled so the endpoints can be shared across VPCs through
-  # a Route 53 resolver rule. Enabled, the name resolves only in this VPC.
+  # Off, because the private hosted zones below answer for these names in every VPC rather than only this one.
   private_dns_enabled = false
+
+  tags = local.tags
+}
+
+# One private zone per service, named as the service's public hostname and associated with the hub and every spoke.
+module "endpoint_zones" {
+  # checkov:skip=CKV2_AWS_23:Both records alias an interface VPC endpoint, which this check does not count as an attached resource.
+  source   = "../../modules/route53-zone"
+  for_each = local.endpoint_zone_names
+
+  name            = each.value
+  comment         = format("Resolves %s to the shared interface endpoint", each.key)
+  private_vpc_ids = values(local.endpoint_zone_vpc_ids)
+
+  # The wildcard covers names addressed below the service, such as <account>.dkr.ecr.
+  records = {
+    apex = {
+      name          = each.value
+      type          = "A"
+      alias_name    = module.endpoints.interface_dns_names[each.key][0].dns_name
+      alias_zone_id = module.endpoints.interface_dns_names[each.key][0].hosted_zone_id
+    }
+    wildcard = {
+      name          = format("*.%s", each.value)
+      type          = "A"
+      alias_name    = module.endpoints.interface_dns_names[each.key][0].dns_name
+      alias_zone_id = module.endpoints.interface_dns_names[each.key][0].hosted_zone_id
+    }
+  }
 
   tags = local.tags
 }
@@ -280,12 +348,9 @@ module "on_premises" {
   static_routes_only = var.on_premises.static_routes_only
   static_routes      = { for cidr in var.on_premises.routes : cidr => cidr }
 
-  # On-premises replies look up the hub table, which has learned the shared VPC and every spoke.
-  transit_gateway_association = { route_table_id = module.transit.route_table_ids["hub"] }
-
-  # The far side's ranges reach both tables, by BGP propagation or by static route.
-  transit_gateway_propagation_route_tables = var.on_premises.static_routes_only ? {} : local.on_premises_route_tables
-  transit_gateway_static_route_tables      = var.on_premises.static_routes_only ? local.on_premises_route_tables : {}
+  transit_gateway_association              = { route_table_id = module.transit.route_table_ids[local.on_premises_association_table] }
+  transit_gateway_propagation_route_tables = local.on_premises_propagation_tables
+  transit_gateway_static_route_tables      = local.on_premises_static_route_tables
 
   log_group_arn = module.vpn_logs[0].arn
 

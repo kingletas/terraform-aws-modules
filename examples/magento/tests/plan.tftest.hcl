@@ -61,13 +61,17 @@ run "plans_with_real_values" {
   }
 
   assert {
-    condition     = local.origin_default_response.status_code == 403
+    condition     = module.alb.https_listener_default_action == { type = "fixed-response", status_code = 403 }
     error_message = "A request that matches no listener rule must get a 403, not reach the web tier."
   }
 
   assert {
-    condition     = keys(local.origin_listener_rules["from_cloudfront"].http_headers) == [local.origin_verify_header] && local.origin_listener_rules["from_cloudfront"].target_group == "web"
-    error_message = "The web tier may be reached only through a rule requiring the origin verify header."
+    condition = (
+      [for name, rule in module.alb.listener_rules : name if rule.action == "forward"] == ["from_cloudfront"]
+      && module.alb.listener_rules["from_cloudfront"].target_group == "web"
+      && module.alb.listener_rules["from_cloudfront"].http_headers == toset(["X-Origin-Verify"])
+    )
+    error_message = "The web tier may be reached only through a rule requiring the X-Origin-Verify header."
   }
 
   assert {
@@ -100,6 +104,31 @@ run "plans_with_real_values" {
   assert {
     condition     = toset(keys(module.service_credentials.names)) == toset(["/storefront-staging/cache/auth-token", "/storefront-staging/search/master-password"])
     error_message = "The Valkey token and the OpenSearch master password must each be stored in a parameter."
+  }
+
+  assert {
+    condition     = local.static_assets_kms_key_arn == null
+    error_message = "The public static bucket must use SSE-S3, or CloudFront cannot decrypt what it serves and every /static/* request is a 403."
+  }
+
+  assert {
+    condition     = toset(flatten([for statement in data.aws_iam_policy_document.node.statement : statement.actions if statement.sid == "ReadStaticAssets"])) == toset(["s3:GetObject", "s3:ListBucket"])
+    error_message = "Web, cron and admin nodes may only read the static bucket."
+  }
+
+  assert {
+    condition     = alltrue([for statement in data.aws_iam_policy_document.node.statement : length(setintersection(toset(statement.actions), toset(["s3:PutObject", "s3:DeleteObject"]))) == 0])
+    error_message = "The shared node role may write and delete in no bucket: Ansible's transfers use presigned URLs from the controller."
+  }
+
+  assert {
+    condition     = length(module.builder_role) == 0
+    error_message = "Without a builder node there is no role that publishes static assets."
+  }
+
+  assert {
+    condition     = length(data.aws_elb_service_account.current) == 1 && toset([for statement in data.aws_iam_policy_document.alb_logs.statement : statement.sid]) == toset(["AllowLoadBalancerLogDelivery", "AllowRegionalLoadBalancerAccountLogDelivery"])
+    error_message = "In us-east-1 the log bucket must admit both the regional ELB account and the log delivery service principal."
   }
 
 }
@@ -152,5 +181,62 @@ run "plans_production_defaults" {
     ami_id           = "ami-0123456789abcdef0"
     environment      = "production"
     include_builder  = true
+  }
+
+  assert {
+    condition     = length(module.builder_role) == 1 && toset(one([for statement in data.aws_iam_policy_document.publish_static.statement : statement.actions if statement.sid == "PublishStaticAssets"])) == toset(["s3:PutObject", "s3:DeleteObject"])
+    error_message = "The builder node's role must be the one that publishes static assets."
+  }
+}
+
+# A region opened after August 2022 has no ELB account, so log delivery rests on the service principal alone.
+run "plans_in_a_region_without_an_elb_account" {
+  command = plan
+
+  override_resource {
+    override_during = plan
+    target          = module.certificate.aws_acm_certificate.this
+    values = {
+      arn = "arn:aws:acm:us-east-1:123456789012:certificate/00000000-0000-0000-0000-000000000000"
+      domain_validation_options = [{
+        domain_name           = "shop.example.com"
+        resource_record_name  = "_0123456789abcdef.shop.example.com."
+        resource_record_type  = "CNAME"
+        resource_record_value = "_fedcba9876543210.acm-validations.aws."
+      }]
+    }
+  }
+
+  override_resource {
+    override_during = plan
+    target          = module.origin_certificate.aws_acm_certificate.this
+    values = {
+      arn = "arn:aws:acm:eu-central-2:123456789012:certificate/00000000-0000-0000-0000-000000000000"
+      domain_validation_options = [{
+        domain_name           = "origin.shop.example.com"
+        resource_record_name  = "_0123456789abcdef.origin.shop.example.com."
+        resource_record_type  = "CNAME"
+        resource_record_value = "_fedcba9876543210.acm-validations.aws."
+      }]
+    }
+  }
+
+  override_data {
+    target = data.aws_ec2_managed_prefix_list.cloudfront_origin
+    values = {
+      id = "pl-3b927c52"
+    }
+  }
+
+  variables {
+    domain_name      = "shop.example.com"
+    hosted_zone_name = "example.com"
+    ami_id           = "ami-0123456789abcdef0"
+    region           = "eu-central-2"
+  }
+
+  assert {
+    condition     = length(data.aws_elb_service_account.current) == 0 && [for statement in data.aws_iam_policy_document.alb_logs.statement : statement.sid] == ["AllowLoadBalancerLogDelivery"]
+    error_message = "Where no ELB account exists, log delivery must be granted to the service principal only."
   }
 }

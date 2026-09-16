@@ -57,4 +57,9 @@ run "plans_with_real_values" {
     ]
     error_message = "Each extraction must receive its source's engine, server name, port and database."
   }
+
+  assert {
+    condition     = local.extract_did_not_run_alarm.period * local.extract_did_not_run_alarm.evaluation_periods == 86400 && local.extract_did_not_run_alarm.datapoints_to_alarm == local.extract_did_not_run_alarm.evaluation_periods && local.extract_did_not_run_alarm.treat_missing_data == "breaching"
+    error_message = "The did-not-run alarm must span exactly one day, the most CloudWatch accepts, and fire only when every hour in it is empty."
+  }
 }

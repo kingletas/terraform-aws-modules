@@ -44,10 +44,11 @@ graph TB
 
 ## Before you deploy
 
+- AWS credentials for the target account, and Terraform 1.9 or later.
+- For configuration: Ansible with the `amazon.aws` and `community.aws` collections, `curl` on the AMI, and the Session Manager plugin.
 - **A public Route 53 hosted zone** for the storefront domain, in the same account. The example creates `<domain>` and `origin.<domain>` records and validates both certificates through it.
 - **A base AMI.** It needs PHP and Magento's extensions, the SSM agent, the CloudWatch agent, `amazon-efs-utils` (the boot script mounts EFS with `mount -t efs -o tls`) and a web server answering `/health_check.php` on port 80. The default node user is `ubuntu`. The default instance types are Graviton (`c7g`) for staging, uat and production, so the AMI must be arm64 there; `dev` uses `t3.large`, which needs x86_64.
 - **The account baseline.** EBS encryption defaults, the account public access block and the password policy belong in [`account-baseline`](../account-baseline), applied once per account.
-- AWS credentials, Terraform 1.9 or later, and for configuration: Ansible with the `amazon.aws` collection and the Session Manager plugin.
 
 ## How to use it
 
@@ -59,15 +60,17 @@ terraform plan
 terraform apply
 ```
 
-`terraform.tfvars` is gitignored. To run the plan tests against mock providers, without credentials:
+`terraform.tfvars` is gitignored.
+
+To check the example without AWS credentials, run its plan test from the top of the repository. It plans against mock providers and creates nothing:
 
 ```bash
-terraform test
+make test DIR=examples/magento
 ```
 
 The tests plan both the staging defaults and production with the builder node.
 
-The example's `.tf` files call modules with relative paths (`../../modules/<name>`). A copy used outside this repository should switch each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.3.0`.
+The `.tf` files call modules by relative path (`../../modules/<name>`). If you copy this example outside this repository, change each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.3.0`.
 
 ### Configure the nodes
 
@@ -126,9 +129,7 @@ Invalidate narrowly. Content-hashed asset names never need it.
 | `enable_waf` | `true` | Put the WAF in front of CloudFront |
 | `alert_email` | `null` | Email subscribed to alarms; the subscription must be confirmed from the inbox |
 
-## Design notes
-
-### What is cattle and what is a pet
+## What is cattle and what is a pet
 
 The web tier autoscales and is replaced by an instance refresh. Two jobs cannot be:
 
@@ -141,7 +142,7 @@ If the cron node dies, the site keeps serving and taking orders; indexing stops.
 
 `include_builder` adds a third singleton and is **off by default**. Where CI builds the AMI there is nothing for a builder to do, and an idle `c7g.2xlarge` is an expensive way to do nothing.
 
-### CloudFront, not a Varnish tier
+## CloudFront, not a Varnish tier
 
 Varnish in front of the web tier is the traditional Magento answer. On AWS, CloudFront is the better fit:
 
@@ -151,11 +152,13 @@ Varnish in front of the web tier is the traditional Magento answer. On AWS, Clou
 
 The `/static/*` behaviour goes straight to S3, so static content never touches PHP. `/media/*` is cached from the origin. What is lost is Varnish's VCL; edge logic that needs it goes in a CloudFront Function.
 
-### The load balancer answers only CloudFront
+The static bucket is encrypted with SSE-S3 rather than the stack's KMS key: its objects are public through CloudFront anyway, and CloudFront's origin access control cannot read objects under a key that does not trust it. **Only the builder node can write the bucket.** Web, cron and admin nodes can read it and nothing more, so a compromised web node cannot plant a script every shopper downloads. Without `include_builder`, publish static assets from the pipeline that builds the AMI, with its own credentials.
+
+## The load balancer answers only CloudFront
 
 The load balancer has no port 80 listener, and its security group accepts HTTPS only from CloudFront's origin-facing managed prefix list. CloudFront adds an `X-Origin-Verify` header carrying a generated secret, and the only listener rule that forwards to the web tier requires it. Any other request, including one from another CloudFront distribution, gets a 403.
 
-### Configuration is discovered, not written
+## Configuration is discovered, not written
 
 **Half the stack is an autoscaling group.** Those instances do not exist when Terraform plans, and a host list written at apply time is wrong the first time the group scales. So the inventory is a rule, not a list:
 
@@ -168,13 +171,13 @@ keyed_groups:
   - key: tags.Role
 ```
 
-A node joins its group (`web`, `cron`, `admin`, `builder`) by existing and carrying its `Role` tag. Ansible connects over Systems Manager, moving files through a dedicated S3 bucket, so this needs no key and no open port.
+A node joins its group (`web`, `cron`, `admin`, `builder`) by existing and carrying its `Role` tag. Ansible connects over Systems Manager, moving files through a dedicated S3 bucket, so this needs no key and no open port. The nodes have no permission on that bucket: the `community.aws.aws_ssm` connection plugin (community.aws 3.6.0 to 7.1.0, and `amazon.aws.aws_ssm` in amazon.aws 11.4.0, which community.aws redirects to) uploads and deletes with the credentials of the machine running Ansible and hands each node a presigned URL for `curl`, so that machine needs `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`, `s3:ListBucket` and `s3:GetBucketLocation` on it.
 
 **Facts go to SSM Parameter Store, not to a file.** Every operator and every CI runner reads the same values. `terraform output ansible_facts_parameter` names the parameter. The same endpoints are written to `/etc/magento/environment` on each node at boot.
 
 **Nothing secret is in the facts.** They carry the *ARN* of the database secret and the *names* of two SSM SecureString parameters holding the Valkey auth token and the OpenSearch master password. A node reads the values at runtime through its instance profile, which can read those three and nothing else. The same names are in `/etc/magento/environment` as `MAGENTO_DB_SECRET_ARN`, `MAGENTO_REDIS_AUTH_PARAMETER` and `MAGENTO_SEARCH_PASSWORD_PARAMETER`. `env.php` needs the Valkey token, with `scheme => tls`, for both the cache and the session handler.
 
-### Environment separation is one variable
+## Environment separation is one variable
 
 The `context` module holds one table of per-environment defaults, and nothing in this stack checks the environment beyond reading it. See [`context`](../../modules/context).
 
