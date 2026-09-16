@@ -8,7 +8,7 @@ Certificate, Active Directory and SAML authentication are all supported. Connect
 
 ```hcl
 module "vpn" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/client-vpn?ref=v0.3.1"
+  source = "github.com/kingletas/terraform-aws-modules//modules/client-vpn?ref=v0.4.0"
 
   name              = "platform"
   vpc_id            = module.vpc.vpc_id

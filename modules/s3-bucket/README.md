@@ -6,7 +6,7 @@ A private S3 bucket: every public access route blocked, encrypted, versioned, an
 
 ```hcl
 module "assets" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/s3-bucket?ref=v0.3.1"
+  source = "github.com/kingletas/terraform-aws-modules//modules/s3-bucket?ref=v0.4.0"
 
   name        = "example-assets-prod"
   kms_key_arn = module.kms.arn
@@ -67,7 +67,7 @@ data "aws_iam_policy_document" "cloudtrail" {
 }
 
 module "cloudtrail_logs" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/s3-bucket?ref=v0.3.1"
+  source = "github.com/kingletas/terraform-aws-modules//modules/s3-bucket?ref=v0.4.0"
 
   name             = local.logs_bucket
   policy_documents = [data.aws_iam_policy_document.cloudtrail.json]

@@ -6,7 +6,7 @@ A task definition and the service that runs it, with a deployment circuit breake
 
 ```hcl
 module "api" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/ecs-service?ref=v0.3.1"
+  source = "github.com/kingletas/terraform-aws-modules//modules/ecs-service?ref=v0.4.0"
 
   name        = "platform-api"
   cluster_arn = module.cluster.arn

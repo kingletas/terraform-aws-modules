@@ -6,7 +6,7 @@ An Aurora cluster with a writer and readers, defaulting to Serverless v2 capacit
 
 ```hcl
 module "database" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/aurora-cluster?ref=v0.3.1"
+  source = "github.com/kingletas/terraform-aws-modules//modules/aurora-cluster?ref=v0.4.0"
 
   name           = "platform"
   engine         = "aurora-postgresql"

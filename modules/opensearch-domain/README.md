@@ -6,7 +6,7 @@ A search domain inside your VPC, encrypted at rest and in flight, with HTTPS enf
 
 ```hcl
 module "search" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/opensearch-domain?ref=v0.3.1"
+  source = "github.com/kingletas/terraform-aws-modules//modules/opensearch-domain?ref=v0.4.0"
 
   name           = "platform-search"
   instance_type  = "r7g.large.search"

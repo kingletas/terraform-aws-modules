@@ -6,7 +6,7 @@ A topic and its subscriptions, for fanning one message out to queues, functions 
 
 ```hcl
 module "alerts" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/sns-topic?ref=v0.3.1"
+  source = "github.com/kingletas/terraform-aws-modules//modules/sns-topic?ref=v0.4.0"
 
   name       = "platform-alerts"
   kms_key_id = module.kms.key_id

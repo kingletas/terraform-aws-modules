@@ -6,7 +6,7 @@ A DMS replication instance, its endpoints and its tasks, with credentials read f
 
 ```hcl
 module "replication" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/dms-replication?ref=v0.3.1"
+  source = "github.com/kingletas/terraform-aws-modules//modules/dms-replication?ref=v0.4.0"
 
   name           = "warehouse-load"
   instance_class = "dms.t3.medium"

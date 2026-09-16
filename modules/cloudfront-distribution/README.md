@@ -6,7 +6,7 @@ A CloudFront distribution with origin access control for S3, ordered cache behav
 
 ```hcl
 module "cdn" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/cloudfront-distribution?ref=v0.3.1"
+  source = "github.com/kingletas/terraform-aws-modules//modules/cloudfront-distribution?ref=v0.4.0"
 
   comment         = "platform web"
   aliases         = ["www.example.com"]

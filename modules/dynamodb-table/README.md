@@ -6,7 +6,7 @@ A table with point-in-time recovery and deletion protection on, and indexes decl
 
 ```hcl
 module "sessions" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/dynamodb-table?ref=v0.3.1"
+  source = "github.com/kingletas/terraform-aws-modules//modules/dynamodb-table?ref=v0.4.0"
 
   name      = "sessions"
   hash_key  = "session_id"

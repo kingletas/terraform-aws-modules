@@ -6,7 +6,7 @@ Interface and gateway endpoints, so a private subnet reaches AWS services withou
 
 ```hcl
 module "endpoints" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/vpc-endpoints?ref=v0.3.1"
+  source = "github.com/kingletas/terraform-aws-modules//modules/vpc-endpoints?ref=v0.4.0"
 
   name   = "platform"
   vpc_id = module.vpc.vpc_id

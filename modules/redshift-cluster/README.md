@@ -6,7 +6,7 @@ A Redshift cluster with encryption, enhanced VPC routing and audit logging, size
 
 ```hcl
 module "warehouse" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/redshift-cluster?ref=v0.3.1"
+  source = "github.com/kingletas/terraform-aws-modules//modules/redshift-cluster?ref=v0.4.0"
 
   name            = "analytics"
   database_name   = "warehouse"

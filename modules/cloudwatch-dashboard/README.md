@@ -6,7 +6,7 @@ A dashboard whose widgets CloudWatch lays out for you, so adding one does not me
 
 ```hcl
 module "dashboard" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/cloudwatch-dashboard?ref=v0.3.1"
+  source = "github.com/kingletas/terraform-aws-modules//modules/cloudwatch-dashboard?ref=v0.4.0"
 
   name = "platform-overview"
 

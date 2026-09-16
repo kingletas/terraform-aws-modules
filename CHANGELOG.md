@@ -6,11 +6,11 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
-## [0.3.1] - 2026-09-16
+## [0.4.0] - 2026-09-16
 
 ### Added
 
-- **`rds-instance`**: `delete_automated_backups`, off by default, so an instance's automated backups stay restorable for their retention period after it is deleted. An existing instance shows an in-place update on its next plan.
+- **`rds-instance`**: `delete_automated_backups`, off by default, so an instance's automated backups stay restorable for their retention period after it is deleted. An existing instance shows an in-place update on its next plan. The provider's own default deleted them, so this changes what a destroy leaves behind.
 
 ## [0.3.0] - 2026-09-16
 
@@ -168,8 +168,8 @@ The first release.
 - Encryption is on, public addresses are off and IMDSv2 is required, each with a variable to choose otherwise deliberately.
 - No module carries a provider block.
 
-[Unreleased]: https://github.com/kingletas/terraform-aws-modules/compare/v0.3.1...HEAD
-[0.3.1]: https://github.com/kingletas/terraform-aws-modules/releases/tag/v0.3.1
+[Unreleased]: https://github.com/kingletas/terraform-aws-modules/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/kingletas/terraform-aws-modules/releases/tag/v0.4.0
 [0.3.0]: https://github.com/kingletas/terraform-aws-modules/releases/tag/v0.3.0
 [0.2.0]: https://github.com/kingletas/terraform-aws-modules/tree/ea80d9b4a36eb0a0f26c6179be6d22a9918850f5
 [0.1.0]: https://github.com/kingletas/terraform-aws-modules/tree/fade717f693f0ad5b6200d453b285013ef6a5991

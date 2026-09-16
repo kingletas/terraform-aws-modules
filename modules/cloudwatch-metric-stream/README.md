@@ -6,7 +6,7 @@ Pushes CloudWatch metrics to a delivery stream as they arrive, instead of someth
 
 ```hcl
 module "metric_stream" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/cloudwatch-metric-stream?ref=v0.3.1"
+  source = "github.com/kingletas/terraform-aws-modules//modules/cloudwatch-metric-stream?ref=v0.4.0"
 
   name         = "to-vendor"
   role_arn     = module.metric_stream_role.arn
