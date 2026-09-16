@@ -90,6 +90,7 @@ Setting `manage_master_password = false` and supplying `password` puts a credent
 | iam\_database\_authentication\_enabled | Allow connecting with an IAM token instead of a stored password. Not every engine and class supports it. | `bool` | `true` | no |
 | deletion\_protection | Refuse to delete the instance until this is turned off. | `bool` | `true` | no |
 | skip\_final\_snapshot | Delete without taking a final snapshot. Off, so a destroy leaves something to restore from. | `bool` | `false` | no |
+| delete\_automated\_backups | Delete the automated backups when the instance is deleted. Off, so they stay restorable for their retention period after a destroy. | `bool` | `false` | no |
 | apply\_immediately | Apply changes now rather than in the next maintenance window. Some changes cause an outage. | `bool` | `false` | no |
 | auto\_minor\_version\_upgrade | Take minor engine upgrades automatically during the maintenance window. | `bool` | `true` | no |
 | tags | Tags applied to every resource this module creates. | `map(string)` | `{}` | no |

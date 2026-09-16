@@ -174,6 +174,12 @@ variable "skip_final_snapshot" {
   default     = false
 }
 
+variable "delete_automated_backups" {
+  type        = bool
+  description = "Delete the automated backups when the instance is deleted. Off, so they stay restorable for their retention period after a destroy."
+  default     = false
+}
+
 variable "apply_immediately" {
   type        = bool
   description = "Apply changes now rather than in the next maintenance window. Some changes cause an outage."

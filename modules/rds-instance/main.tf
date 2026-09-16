@@ -112,6 +112,7 @@ resource "aws_db_instance" "this" {
   # Set even when skipped, so turning skip_final_snapshot off later still leaves a name for the destroy to use.
   final_snapshot_identifier = format("%s-final", var.name)
   copy_tags_to_snapshot     = true
+  delete_automated_backups  = var.delete_automated_backups
 
   tags = local.tags
 

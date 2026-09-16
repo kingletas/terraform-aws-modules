@@ -6,6 +6,10 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **`rds-instance`**: `delete_automated_backups`, off by default, so an instance's automated backups stay restorable for their retention period after it is deleted. An existing instance shows an in-place update on its next plan.
+
 ## [0.3.0] - 2026-09-16
 
 ### Security

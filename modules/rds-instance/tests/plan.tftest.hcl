@@ -35,3 +35,32 @@ run "names_the_final_snapshot_even_when_skipped" {
     error_message = "The monitoring policy ARN must be built from the current partition."
   }
 }
+
+run "keeps_automated_backups_by_default" {
+  command = plan
+
+  variables {
+    name       = "plan-test"
+    subnet_ids = ["subnet-0aaaaaaaaaaaaaaa1", "subnet-0bbbbbbbbbbbbbbb2"]
+  }
+
+  assert {
+    condition     = aws_db_instance.this.delete_automated_backups == false
+    error_message = "Automated backups must survive the instance being deleted unless the caller asks otherwise."
+  }
+}
+
+run "deletes_automated_backups_when_asked" {
+  command = plan
+
+  variables {
+    name                     = "plan-test"
+    subnet_ids               = ["subnet-0aaaaaaaaaaaaaaa1", "subnet-0bbbbbbbbbbbbbbb2"]
+    delete_automated_backups = true
+  }
+
+  assert {
+    condition     = aws_db_instance.this.delete_automated_backups == true
+    error_message = "delete_automated_backups must reach the instance."
+  }
+}
