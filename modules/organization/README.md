@@ -6,7 +6,7 @@ An AWS Organization, the organizational units under it, and the member accounts 
 
 ```hcl
 module "organization" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/organization?ref=v0.2.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/organization?ref=v0.3.0"
 
   aws_service_access_principals = ["cloudtrail.amazonaws.com", "sso.amazonaws.com"]
 
@@ -63,7 +63,7 @@ Both policy types and trusted service access need `feature_set = "ALL"`. A conso
 
 - **Deploy nothing into the management account.** It is where the organization is administered from, it cannot be restricted by a service control policy the way a member account can, and anything running in it is outside the guardrails every other account is inside.
 - **An account email must be one no AWS account has ever used**, including closed ones. Plus-addressing (`aws+production@example.com`) is the usual way to keep them distinct on one mailbox.
-- `account_role_arns` gives the ARN to assume in each member account from the management account, which is what a provider alias in a downstream stack needs.
+- `account_role_arns` gives the ARN to assume in each member account from the management account, which is what a provider alias in a downstream stack needs. The ARNs use the partition the provider runs in, so they are correct in AWS GovCloud (US) and China as well.
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements

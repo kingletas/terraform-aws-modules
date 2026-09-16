@@ -21,22 +21,54 @@ variable "cidr_block" {
 
 variable "availability_zones" {
   type        = list(string)
-  description = "Availability zones to spread subnets across. One public and one private subnet are created per zone."
+  description = "Availability zones to spread subnets across, at most eight. One public and one private subnet are created per zone, placed by the zone's last letter (a is 0, h is 7) unless availability_zone_indexes names it."
 
   validation {
-    condition     = length(var.availability_zones) > 0
-    error_message = "At least one availability zone is required."
+    condition     = length(var.availability_zones) > 0 && length(var.availability_zones) <= 8
+    error_message = "Between one and eight availability zones are required."
+  }
+
+  validation {
+    condition = alltrue([
+      for zone in var.availability_zones :
+      contains(keys(var.availability_zone_indexes), zone) || can(regex("[a-h]$", zone))
+    ])
+    error_message = "Each availability zone must end in a letter from a to h, or be given a position in availability_zone_indexes."
+  }
+
+  validation {
+    condition = length(distinct([
+      for zone in var.availability_zones :
+      contains(keys(var.availability_zone_indexes), zone) ? tostring(var.availability_zone_indexes[zone]) : try(tostring(index(["a", "b", "c", "d", "e", "f", "g", "h"], substr(zone, length(zone) - 1, 1))), zone)
+    ])) == length(var.availability_zones)
+    error_message = "Two availability zones resolve to the same subnet position. Give each a distinct position in availability_zone_indexes."
+  }
+}
+
+variable "availability_zone_indexes" {
+  type        = map(number)
+  description = "Subnet position from 0 to 7 for a zone whose last letter does not place it, such as a Local Zone that shares a letter with a regional zone. Keyed by zone name."
+  default     = {}
+
+  validation {
+    condition     = alltrue([for _, position in var.availability_zone_indexes : position >= 0 && position <= 7 && floor(position) == position])
+    error_message = "Each position in availability_zone_indexes must be a whole number from 0 to 7."
   }
 }
 
 variable "subnet_newbits" {
   type        = number
-  description = "Bits added to the VPC prefix when carving subnets. A /16 with 8 newbits yields /24 subnets."
+  description = "Bits added to the VPC prefix when carving subnets. At least 4, because each tier reserves eight subnet slots. A /16 with 8 newbits yields /24 subnets."
   default     = 8
 
   validation {
-    condition     = var.subnet_newbits >= 1 && var.subnet_newbits <= 16
-    error_message = "The subnet_newbits value must be between 1 and 16."
+    condition     = var.subnet_newbits >= 4 && var.subnet_newbits <= 16
+    error_message = "The subnet_newbits value must be between 4 and 16, so both tiers of eight zones fit in the VPC."
+  }
+
+  validation {
+    condition     = !can(cidrhost(var.cidr_block, 0)) || tonumber(split("/", var.cidr_block)[1]) + var.subnet_newbits <= 28
+    error_message = "The cidr_block prefix plus subnet_newbits must be /28 or larger, which is the smallest subnet AWS allows."
   }
 }
 

@@ -6,7 +6,7 @@ A transit gateway with attachments and route tables, for connecting more VPCs th
 
 ```hcl
 module "transit" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/transit-gateway?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/transit-gateway?ref=v0.3.0"
 
   name = "platform"
 
@@ -34,6 +34,27 @@ module "transit" {
 Segmentation comes from the pair. Putting every spoke in a `spokes` table that propagates only to `shared` gives you hub-and-spoke: every VPC reaches shared services, none reaches its siblings. Getting these the wrong way round produces a mesh, quietly.
 
 The module leaves the default association and propagation off, so an attachment is isolated until you say otherwise.
+
+An attachment can be associated with only one route table. `route_table_key` therefore cannot be combined with `default_route_table_association = true`, and the plan fails if you set both.
+
+## Static routes
+
+Each entry in `static_routes` names a table with `route_table_key` and forwards to the attachment named by `attachment_key`. A blackhole route (`blackhole = true`) drops matching traffic and takes no `attachment_key`. The plan fails when a key does not name an entry in `route_tables` or `vpc_attachments`.
+
+```hcl
+static_routes = {
+  on_premises = {
+    route_table_key        = "shared"
+    destination_cidr_block = "10.100.0.0/16"
+    attachment_key         = "platform"
+  }
+  drop_legacy = {
+    route_table_key        = "spokes"
+    destination_cidr_block = "10.200.0.0/16"
+    blackhole              = true
+  }
+}
+```
 
 ## Notes
 
@@ -81,9 +102,9 @@ The module leaves the default association and propagation off, so an attachment 
 | default\_route\_table\_propagation | Propagate every attachment's routes into the default route table. | `bool` | `false` | no |
 | dns\_support | Resolve public DNS to private addresses across attachments. | `bool` | `true` | no |
 | multicast\_support | Enable multicast. Cannot be changed after creation. | `bool` | `false` | no |
-| vpc\_attachments | VPC attachments keyed by a stable name. Use one subnet per availability zone you want reachable. | <pre>map(object({<br/>    vpc_id              = string<br/>    subnet_ids          = list(string)<br/>    appliance_mode      = optional(bool, false)<br/>    dns_support         = optional(bool, true)<br/>    route_table_key     = optional(string)<br/>    propagate_to_tables = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
+| vpc\_attachments | VPC attachments keyed by a stable name. Use one subnet per availability zone you want reachable. route\_table\_key names the one table an attachment is associated with, and cannot be combined with default\_route\_table\_association. | <pre>map(object({<br/>    vpc_id              = string<br/>    subnet_ids          = list(string)<br/>    appliance_mode      = optional(bool, false)<br/>    dns_support         = optional(bool, true)<br/>    route_table_key     = optional(string)<br/>    propagate_to_tables = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
 | route\_tables | Route tables keyed by a stable name, with a description as the value. Segmentation is what a transit gateway is for. | `map(string)` | `{}` | no |
-| static\_routes | Static routes keyed by a stable name. A blackhole route drops traffic rather than forwarding it. | <pre>map(object({<br/>    route_table_key        = string<br/>    destination_cidr_block = string<br/>    attachment_key         = optional(string)<br/>    blackhole              = optional(bool, false)<br/>  }))</pre> | `{}` | no |
+| static\_routes | Static routes keyed by a stable name. A route forwards to the attachment named by attachment\_key, or is a blackhole that drops traffic and names no attachment. | <pre>map(object({<br/>    route_table_key        = string<br/>    destination_cidr_block = string<br/>    attachment_key         = optional(string)<br/>    blackhole              = optional(bool, false)<br/>  }))</pre> | `{}` | no |
 | share\_with\_principals | Account IDs or organization ARNs to share the gateway with through Resource Access Manager. | `list(string)` | `[]` | no |
 | tags | Tags applied to every resource this module creates. | `map(string)` | `{}` | no |
 

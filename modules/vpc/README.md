@@ -10,7 +10,7 @@ Flow logging is on by default, writing to a CloudWatch log group this module cre
 
 ```hcl
 module "vpc" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/vpc?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/vpc?ref=v0.3.0"
 
   name               = "platform"
   cidr_block         = "10.0.0.0/16"
@@ -24,24 +24,37 @@ module "vpc" {
 
 ## How subnets are addressed
 
-Subnets are carved from `cidr_block` with `cidrsubnet`. `subnet_newbits` decides how many bits are added to the VPC prefix, so a `/16` with the default `8` gives you `/24` subnets — 254 usable addresses each.
+Subnets are carved from `cidr_block` with `cidrsubnet(cidr_block, subnet_newbits, slot)`. `subnet_newbits` is how many bits are added to the VPC prefix, so a `/16` with the default `8` gives `/24` subnets, each with 251 usable addresses (AWS reserves five in every subnet).
 
-Public subnets take the first block per zone, private subnets continue where the public ones stop. With three zones and the defaults you get:
+A zone's position comes from the last letter of its name: `a` is 0, `b` is 1, and so on up to `h`, which is 7. Each tier owns eight slots. A zone's public subnet uses slot `position` and its private subnet uses slot `8 + position`. With the defaults you get:
 
 | Zone | Public | Private |
 |---|---|---|
-| First | `10.0.0.0/24` | `10.0.3.0/24` |
-| Second | `10.0.1.0/24` | `10.0.4.0/24` |
-| Third | `10.0.2.0/24` | `10.0.5.0/24` |
+| `us-east-1a` | `10.0.0.0/24` | `10.0.8.0/24` |
+| `us-east-1b` | `10.0.1.0/24` | `10.0.9.0/24` |
+| `us-east-1c` | `10.0.2.0/24` | `10.0.10.0/24` |
 
-Adding a zone shifts the private range, which replaces subnets. Decide how many zones you want before you apply, or set `subnet_newbits` high enough to leave room.
+A zone's subnets depend only on its own position, so adding or removing another zone does not move them. The sixteen slots are why a VPC holds at most eight zones and why `subnet_newbits` must be at least 4. The VPC prefix plus `subnet_newbits` must also give subnets of `/28` or larger, the smallest subnet AWS allows.
+
+A Local Zone can share its last letter with a regional zone, and a Wavelength Zone ends in a digit. Give either a position of its own, from 0 to 7, in `availability_zone_indexes`. The plan fails if two zones resolve to the same position.
+
+```hcl
+module "vpc" {
+  source = "github.com/kingletas/terraform-aws-modules//modules/vpc?ref=v0.3.0"
+
+  name                      = "platform"
+  cidr_block                = "10.0.0.0/16"
+  availability_zones        = ["us-west-2a", "us-west-2b", "us-west-2-lax-1a"]
+  availability_zone_indexes = { "us-west-2-lax-1a" = 7 }
+}
+```
 
 ## What this costs
 
 A NAT gateway is billed hourly per zone plus per gigabyte processed, and it is usually the largest line on a small VPC's bill. Three of them cost three times as much as one.
 
 - `enable_nat_gateway = false` if nothing in a private subnet needs outbound internet.
-- `single_nat_gateway = true` to share one across every zone. Cheaper, and losing that zone takes outbound traffic down for all of them.
+- `single_nat_gateway = true` to share one, placed in the first zone in `availability_zones`, across every zone. Cheaper, and losing that zone takes outbound traffic down for all of them.
 
 ## Notes
 
@@ -91,8 +104,9 @@ A NAT gateway is billed hourly per zone plus per gigabyte processed, and it is u
 | ---- | ----------- | ---- | ------- | :------: |
 | name | Name prefix applied to the VPC and everything inside it. | `string` | n/a | yes |
 | cidr\_block | IPv4 CIDR block for the VPC. | `string` | `"10.0.0.0/16"` | no |
-| availability\_zones | Availability zones to spread subnets across. One public and one private subnet are created per zone. | `list(string)` | n/a | yes |
-| subnet\_newbits | Bits added to the VPC prefix when carving subnets. A /16 with 8 newbits yields /24 subnets. | `number` | `8` | no |
+| availability\_zones | Availability zones to spread subnets across, at most eight. One public and one private subnet are created per zone, placed by the zone's last letter (a is 0, h is 7) unless availability\_zone\_indexes names it. | `list(string)` | n/a | yes |
+| availability\_zone\_indexes | Subnet position from 0 to 7 for a zone whose last letter does not place it, such as a Local Zone that shares a letter with a regional zone. Keyed by zone name. | `map(number)` | `{}` | no |
+| subnet\_newbits | Bits added to the VPC prefix when carving subnets. At least 4, because each tier reserves eight subnet slots. A /16 with 8 newbits yields /24 subnets. | `number` | `8` | no |
 | enable\_nat\_gateway | Give private subnets outbound internet access through a NAT gateway. | `bool` | `true` | no |
 | single\_nat\_gateway | Route every private subnet through one NAT gateway instead of one per zone. Cheaper, and a single point of failure. | `bool` | `false` | no |
 | map\_public\_ip\_on\_launch | Assign a public IP to instances launched into a public subnet. Off by default; attach an Elastic IP or use a NAT gateway instead. | `bool` | `false` | no |

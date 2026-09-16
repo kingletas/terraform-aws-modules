@@ -45,6 +45,6 @@ output "account_role_arns" {
   description = "ARN of the role to assume in each member account from the management account."
   value = {
     for key, account in aws_organizations_account.this :
-    key => format("arn:aws:iam::%s:role/%s", account.id, var.accounts[key].role_name)
+    key => format("arn:%s:iam::%s:role/%s", data.aws_partition.current.partition, account.id, var.accounts[key].role_name)
   }
 }

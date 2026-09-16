@@ -22,13 +22,15 @@ variable "customer_gateway_certificate_arn" {
 
 variable "transit_gateway_id" {
   type        = string
-  description = "Transit gateway to attach to. Set this or vpc_id, not both."
+  description = "Transit gateway to attach to. Set this or vpn_gateway, not both."
   default     = null
 }
 
-variable "vpc_id" {
-  type        = string
-  description = "VPC to create a virtual private gateway in. Set this or transit_gateway_id, not both."
+variable "vpn_gateway" {
+  type = object({
+    vpc_id = string
+  })
+  description = "Creates a virtual private gateway in this VPC and attaches the connection to it. Set this or transit_gateway_id, not both."
   default     = null
 }
 
@@ -39,9 +41,14 @@ variable "static_routes_only" {
 }
 
 variable "static_routes" {
-  type        = list(string)
-  description = "CIDRs reachable at the far side. Required when static_routes_only is on."
-  default     = []
+  type        = map(string)
+  description = "CIDRs reachable at the far side, keyed by a stable name. Required when static_routes_only is on. With vpn_gateway they become VPN connection routes; with transit_gateway_id they become routes in transit_gateway_static_route_tables."
+  default     = {}
+
+  validation {
+    condition     = alltrue([for cidr in values(var.static_routes) : can(cidrnetmask(cidr))])
+    error_message = "Every static_routes value must be an IPv4 CIDR block."
+  }
 }
 
 variable "local_ipv4_network_cidr" {
@@ -69,10 +76,30 @@ variable "tunnel_preshared_keys" {
   sensitive   = true
 }
 
-variable "propagate_to_route_table_ids" {
-  type        = list(string)
-  description = "Route tables that learn routes from the virtual private gateway. Only used with vpc_id."
-  default     = []
+variable "vpn_gateway_propagation_route_tables" {
+  type        = map(string)
+  description = "VPC route tables that learn routes from the virtual private gateway, keyed by a stable name. Only with vpn_gateway."
+  default     = {}
+}
+
+variable "transit_gateway_association" {
+  type = object({
+    route_table_id = string
+  })
+  description = "Transit gateway route table the VPN attachment looks up routes in. Only with transit_gateway_id, and not when the gateway associates new attachments with its default table. Null leaves the attachment unassociated."
+  default     = null
+}
+
+variable "transit_gateway_propagation_route_tables" {
+  type        = map(string)
+  description = "Transit gateway route tables that learn the far side's BGP routes, keyed by a stable name. Only with transit_gateway_id."
+  default     = {}
+}
+
+variable "transit_gateway_static_route_tables" {
+  type        = map(string)
+  description = "Transit gateway route tables that get a route to each static_routes CIDR through the VPN attachment, keyed by a stable name. Required for static routing with transit_gateway_id."
+  default     = {}
 }
 
 variable "enable_tunnel_logging" {

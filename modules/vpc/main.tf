@@ -1,8 +1,19 @@
 locals {
-  zones = { for index, zone in var.availability_zones : zone => index }
+  # The last letter of a zone name gives its position, so a zone keeps its subnets when others are added or removed.
+  zone_letters = ["a", "b", "c", "d", "e", "f", "g", "h"]
 
-  # Public subnets take the low half of the address space, private subnets the high half.
-  private_offset = length(var.availability_zones)
+  zones = {
+    for zone in var.availability_zones : zone => lookup(
+      var.availability_zone_indexes,
+      zone,
+      try(index(local.zone_letters, substr(zone, length(zone) - 1, 1)), -1),
+    )
+  }
+
+  # Each tier owns a fixed block of subnet slots, sized for the maximum number of zones.
+  max_availability_zones = length(local.zone_letters)
+  public_offset          = 0
+  private_offset         = local.max_availability_zones
 
   nat_zones = var.enable_nat_gateway ? (
     var.single_nat_gateway ? slice(var.availability_zones, 0, 1) : var.availability_zones
@@ -39,7 +50,7 @@ resource "aws_subnet" "public" {
 
   vpc_id                  = aws_vpc.this.id
   availability_zone       = each.key
-  cidr_block              = cidrsubnet(var.cidr_block, var.subnet_newbits, each.value)
+  cidr_block              = cidrsubnet(var.cidr_block, var.subnet_newbits, each.value + local.public_offset)
   map_public_ip_on_launch = var.map_public_ip_on_launch
 
   tags = merge(var.tags, {

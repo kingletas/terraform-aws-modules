@@ -48,6 +48,8 @@ resource "aws_organizations_organization" "this" {
   }
 }
 
+data "aws_partition" "current" {}
+
 data "aws_organizations_organization" "existing" {
   count = var.create_organization ? 0 : 1
 }

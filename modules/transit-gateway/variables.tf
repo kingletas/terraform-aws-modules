@@ -54,8 +54,15 @@ variable "vpc_attachments" {
     route_table_key     = optional(string)
     propagate_to_tables = optional(list(string), [])
   }))
-  description = "VPC attachments keyed by a stable name. Use one subnet per availability zone you want reachable."
+  description = "VPC attachments keyed by a stable name. Use one subnet per availability zone you want reachable. route_table_key names the one table an attachment is associated with, and cannot be combined with default_route_table_association."
   default     = {}
+
+  validation {
+    condition = !var.default_route_table_association || alltrue([
+      for _, attachment in var.vpc_attachments : attachment.route_table_key == null
+    ])
+    error_message = "An attachment can be associated with only one route table. With default_route_table_association on, every attachment already joins the default table, so leave route_table_key unset or turn default association off."
+  }
 }
 
 variable "route_tables" {
@@ -71,8 +78,23 @@ variable "static_routes" {
     attachment_key         = optional(string)
     blackhole              = optional(bool, false)
   }))
-  description = "Static routes keyed by a stable name. A blackhole route drops traffic rather than forwarding it."
+  description = "Static routes keyed by a stable name. A route forwards to the attachment named by attachment_key, or is a blackhole that drops traffic and names no attachment."
   default     = {}
+
+  validation {
+    condition = alltrue([
+      for _, route in var.static_routes :
+      route.blackhole ? route.attachment_key == null : try(contains(keys(var.vpc_attachments), route.attachment_key), false)
+    ])
+    error_message = "Each static route needs attachment_key naming one of vpc_attachments, unless blackhole is true, in which case leave attachment_key unset."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, route in var.static_routes : contains(keys(var.route_tables), route.route_table_key)
+    ])
+    error_message = "Each static route's route_table_key must name one of route_tables."
+  }
 }
 
 variable "share_with_principals" {

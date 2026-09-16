@@ -29,7 +29,7 @@ run "plans_with_real_values" {
   }
 }
 
-# The quiet direction above proves nothing about the loud one. An account naming
+# Refusal tests: each run below must fail the plan. An account naming
 # an organizational unit that was never declared must stop the plan rather than
 # land the account at the root.
 run "refuses_an_account_in_an_unknown_unit" {
@@ -67,4 +67,30 @@ run "refuses_an_account_with_no_email" {
   }
 
   expect_failures = [var.accounts]
+}
+
+run "builds_member_role_arns_in_the_current_partition" {
+  command = plan
+
+  override_data {
+    target = data.aws_partition.current
+    values = { partition = "aws-us-gov" }
+  }
+
+  override_resource {
+    target          = aws_organizations_account.this
+    override_during = plan
+    values          = { id = "210987654321" }
+  }
+
+  variables {
+    accounts = {
+      staging = { name = "staging", email = "aws+staging@example.com" }
+    }
+  }
+
+  assert {
+    condition     = output.account_role_arns["staging"] == "arn:aws-us-gov:iam::210987654321:role/OrganizationAccountAccessRole"
+    error_message = "The member role ARN does not use the current partition."
+  }
 }
