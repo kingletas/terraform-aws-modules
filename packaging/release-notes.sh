@@ -35,6 +35,17 @@ notes="$(awk -v version="$VERSION" '
   found { print }
 ' "$CHANGELOG")"
 
+# The link definitions at the foot of the file sit inside the last version's
+# section, because nothing below them starts a new heading. They are markdown
+# plumbing rather than notes, and the oldest release is the one that gets them.
+# Held back until real content follows, so a definition mid-section survives and
+# a trailing block does not.
+notes="$(printf '%s\n' "$notes" | awk '
+  /^\[[^]]+\]:[[:space:]]/ { held = held $0 "\n"; next }
+  /^[[:space:]]*$/ { held = held $0 "\n"; next }
+  { printf "%s", held; held = ""; print }
+')"
+
 # Trim the blank lines the heading boundaries leave behind.
 notes="$(printf '%s\n' "$notes" | sed -e '/./,$!d' -e ':a' -e '/^\n*$/{$d;N;ba' -e '}')"
 

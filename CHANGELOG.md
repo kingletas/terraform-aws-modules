@@ -4,6 +4,12 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `packaging/release-notes.sh` put the changelog's trailing link definitions into the notes of whichever version is listed last. That version is the oldest one, so the defect only ever showed on a backfill, which is when it showed. A definition inside a section, with content after it, still survives.
+
 ## [0.2.0] - 2026-09-15
 
 ### Added
