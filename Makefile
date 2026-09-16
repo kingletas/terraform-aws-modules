@@ -40,8 +40,12 @@ validate: ## Initialise and validate every module and example
 	@$(ROOT_DIR)/scripts/validate.sh
 
 .PHONY: plan-test
-plan-test: ## Plan every example against mock providers, with real values
+plan-test: ## Plan every example, and every module with its own test, against mock providers
 	@$(ROOT_DIR)/scripts/plan.sh
+
+.PHONY: test
+test: ## Run one directory's plan tests (DIR=modules/<name> or DIR=examples/<name>)
+	@$(ROOT_DIR)/scripts/test.sh "$(DIR)"
 
 .PHONY: lint
 lint: ## Run tflint over every module and example

@@ -15,6 +15,18 @@ export TF_PLUGIN_CACHE_DIR="${TF_PLUGIN_CACHE_DIR:-$ROOT_DIR/local.d/plugin-cach
 export TF_PLUGIN_CACHE_MAY_BREAK_DEPENDENCY_LOCK_FILE="${TF_PLUGIN_CACHE_MAY_BREAK_DEPENDENCY_LOCK_FILE:-true}"
 mkdir -p "$TF_PLUGIN_CACHE_DIR"
 
+# Every check runs against mock providers and needs no AWS account. These
+# credentials are fake and every other credential source is closed, so a test
+# that loses its mock fails with an auth error instead of reaching a real account.
+unset AWS_PROFILE AWS_DEFAULT_PROFILE AWS_SESSION_TOKEN AWS_SECURITY_TOKEN AWS_ROLE_ARN AWS_WEB_IDENTITY_TOKEN_FILE AWS_CONTAINER_CREDENTIALS_FULL_URI AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
+export AWS_ACCESS_KEY_ID="mock-access-key"
+export AWS_SECRET_ACCESS_KEY="mock-secret-key"
+export AWS_SHARED_CREDENTIALS_FILE=/dev/null
+export AWS_CONFIG_FILE=/dev/null
+export AWS_EC2_METADATA_DISABLED=true
+export AWS_ENDPOINT_URL="http://127.0.0.1:9"
+export AWS_REGION="${AWS_REGION:-us-east-1}"
+
 
 # Every directory holding a root or child module, in a stable order.
 terraform_dirs() {
