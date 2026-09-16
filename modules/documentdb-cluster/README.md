@@ -6,7 +6,7 @@ A MongoDB-compatible cluster, encrypted, with TLS and audit logging on by defaul
 
 ```hcl
 module "documents" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/documentdb-cluster?ref=v0.3.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/documentdb-cluster?ref=v0.3.1"
 
   name           = "platform-docs"
   instance_count = 2

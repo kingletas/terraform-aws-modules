@@ -6,14 +6,14 @@ An OpenID Connect provider in IAM, so a CI system gets short-lived AWS credentia
 
 ```hcl
 module "github" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/iam-oidc-provider?ref=v0.3.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/iam-oidc-provider?ref=v0.3.1"
 
   url        = "https://token.actions.githubusercontent.com"
   client_ids = ["sts.amazonaws.com"]
 }
 
 module "deploy_role" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/iam-role?ref=v0.3.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/iam-role?ref=v0.3.1"
 
   name = "github-deploy"
 

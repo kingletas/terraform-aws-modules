@@ -6,7 +6,7 @@ A Managed Workflows for Apache Airflow environment, with a private web server an
 
 ```hcl
 module "airflow" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/mwaa-environment?ref=v0.3.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/mwaa-environment?ref=v0.3.1"
 
   name              = "warehouse"
   airflow_version   = "2.10.3"

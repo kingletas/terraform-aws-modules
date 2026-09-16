@@ -6,7 +6,7 @@ A secret, optionally with a generated first value, and optionally rotated.
 
 ```hcl
 module "api_key" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/secrets-manager-secret?ref=v0.3.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/secrets-manager-secret?ref=v0.3.1"
 
   name        = "prod/api/signing-key"
   description = "Signing key for outbound webhooks"

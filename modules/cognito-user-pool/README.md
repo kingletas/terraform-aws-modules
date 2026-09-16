@@ -6,7 +6,7 @@ A user pool with its app clients and user enumeration closed, with threat protec
 
 ```hcl
 module "users" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/cognito-user-pool?ref=v0.3.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/cognito-user-pool?ref=v0.3.1"
 
   name          = "platform-users"
   domain_prefix = "platform-login"

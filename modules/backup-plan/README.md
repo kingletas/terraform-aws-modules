@@ -6,7 +6,7 @@ A backup vault and plan, selecting resources by tag so new ones are picked up wi
 
 ```hcl
 module "backups" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/backup-plan?ref=v0.3.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/backup-plan?ref=v0.3.1"
 
   name = "platform-daily"
 

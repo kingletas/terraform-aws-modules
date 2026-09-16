@@ -10,7 +10,7 @@ Flow logging is on by default, writing to a CloudWatch log group this module cre
 
 ```hcl
 module "vpc" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/vpc?ref=v0.3.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/vpc?ref=v0.3.1"
 
   name               = "platform"
   cidr_block         = "10.0.0.0/16"
@@ -40,7 +40,7 @@ A Local Zone can share its last letter with a regional zone, and a Wavelength Zo
 
 ```hcl
 module "vpc" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/vpc?ref=v0.3.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/vpc?ref=v0.3.1"
 
   name                      = "platform"
   cidr_block                = "10.0.0.0/16"

@@ -6,7 +6,7 @@ An autoscaling group with instance refresh and target tracking, spread across th
 
 ```hcl
 module "app" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/autoscaling-group?ref=v0.3.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/autoscaling-group?ref=v0.3.1"
 
   name                    = "platform-app"
   launch_template_id      = module.app_template.id

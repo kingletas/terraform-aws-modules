@@ -6,7 +6,7 @@ An AWS Organization, the organizational units under it, and the member accounts 
 
 ```hcl
 module "organization" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/organization?ref=v0.3.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/organization?ref=v0.3.1"
 
   aws_service_access_principals = ["cloudtrail.amazonaws.com", "sso.amazonaws.com"]
 

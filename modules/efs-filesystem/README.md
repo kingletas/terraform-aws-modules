@@ -6,7 +6,7 @@ A shared POSIX file system, with mount targets in the subnets you name and a fil
 
 ```hcl
 module "shared" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/efs-filesystem?ref=v0.3.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/efs-filesystem?ref=v0.3.1"
 
   name               = "platform-shared"
   subnet_ids         = module.vpc.private_subnet_ids

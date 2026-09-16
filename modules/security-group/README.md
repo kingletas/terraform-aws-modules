@@ -10,7 +10,7 @@ Because rules are keyed by a name you choose, removing the third rule from a lis
 
 ```hcl
 module "app_sg" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/security-group?ref=v0.3.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/security-group?ref=v0.3.1"
 
   name        = "platform-app"
   description = "Application instances"

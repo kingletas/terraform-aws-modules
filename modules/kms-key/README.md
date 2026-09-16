@@ -6,7 +6,7 @@ A customer-managed key with rotation on, an alias, and a key policy built from t
 
 ```hcl
 module "kms" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/kms-key?ref=v0.3.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/kms-key?ref=v0.3.1"
 
   name        = "platform-data"
   description = "Encrypts application data at rest"

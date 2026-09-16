@@ -6,7 +6,7 @@ A transit gateway with attachments and route tables, for connecting more VPCs th
 
 ```hcl
 module "transit" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/transit-gateway?ref=v0.3.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/transit-gateway?ref=v0.3.1"
 
   name = "platform"
 
