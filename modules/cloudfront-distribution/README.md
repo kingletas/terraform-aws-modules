@@ -24,6 +24,10 @@ module "cdn" {
 
   default_origin = "static"
 
+  default_behaviour = {
+    cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
+  }
+
   ordered_behaviours = {
     api = {
       path_pattern    = "/api/*"
@@ -31,6 +35,8 @@ module "cdn" {
       precedence      = 10
       allowed_methods = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
       cache_policy_id = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
+
+      origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac" # Managed-AllViewerExceptHostHeader
     }
   }
 }
@@ -49,7 +55,7 @@ Grant `s3:GetObject` to the `cloudfront.amazonaws.com` service principal, condit
 - A change takes several minutes to reach every edge location. `status` says whether it has finished.
 - `PriceClass_100` is North America and Europe only and is materially cheaper.
 - Ordered behaviours are sent to CloudFront lowest `precedence` first, and CloudFront uses the first path pattern that matches. `precedence` is a whole number from 0 to 999999999, and equal values fall back to the order of the behaviour names.
-- A behaviour with no `cache_policy_id`, the default one included, uses the AWS managed `Managed-CachingOptimized` policy. That caches responses, so set a different policy (such as `Managed-CachingDisabled`) for a dynamic origin like an API.
+- **Every behaviour, the default one included, needs a `cache_policy_id`.** There is no fallback, because the right policy depends on the origin. `Managed-CachingOptimized` (`658327ea-f89d-4fab-a63d-7e88639e58f6`) suits static content, but it forwards no cookies, query strings or `Authorization` header, which silently breaks an application. For an application use `Managed-CachingDisabled` (`4135ea2d-6df8-44a3-9df3-4b5a84be39ad`) with an origin request policy such as `Managed-AllViewer`.
 - A custom origin defaults to `https-only`, so its certificate must cover the origin `domain_name`. A load balancer's generated DNS name cannot be covered by a certificate you own; point the origin at a DNS name of your own instead.
 - Access logging needs a bucket with ACLs enabled, which conflicts with the `s3-bucket` module's default `BucketOwnerEnforced`.
 
@@ -83,8 +89,8 @@ Grant `s3:GetObject` to the `cloudfront.amazonaws.com` service principal, condit
 | certificate\_arn | ACM certificate, which must be in us-east-1 whatever region you deploy from. Null uses the CloudFront default certificate and no aliases. | `string` | `null` | no |
 | origins | Origins keyed by a stable ID. An S3 bucket uses origin access control; anything else is treated as a custom origin. | <pre>map(object({<br/>    domain_name = string<br/>    origin_path = optional(string)<br/><br/>    s3_origin_access_control_id  = optional(string)<br/>    create_origin_access_control = optional(bool, false)<br/><br/>    custom_http_port     = optional(number, 80)<br/>    custom_https_port    = optional(number, 443)<br/>    custom_protocol      = optional(string, "https-only")<br/>    custom_ssl_protocols = optional(list(string), ["TLSv1.2"])<br/><br/>    custom_headers = optional(map(string), {})<br/><br/>    connection_attempts = optional(number, 3)<br/>    connection_timeout  = optional(number, 10)<br/>  }))</pre> | n/a | yes |
 | default\_origin | Origin serving anything no ordered behaviour matched. | `string` | n/a | yes |
-| default\_behaviour | Cache behaviour for everything not matched by an ordered behaviour. A null cache\_policy\_id uses Managed-CachingOptimized. | <pre>object({<br/>    viewer_protocol_policy = optional(string, "redirect-to-https")<br/>    allowed_methods        = optional(list(string), ["GET", "HEAD", "OPTIONS"])<br/>    cached_methods         = optional(list(string), ["GET", "HEAD"])<br/>    compress               = optional(bool, true)<br/><br/>    cache_policy_id            = optional(string)<br/>    origin_request_policy_id   = optional(string)<br/>    response_headers_policy_id = optional(string)<br/><br/>    function_associations = optional(map(object({<br/>      event_type   = string<br/>      function_arn = string<br/>    })), {})<br/>  })</pre> | `{}` | no |
-| ordered\_behaviours | Path-specific behaviours keyed by a stable name. Lower precedence numbers are evaluated first, and equal precedences fall back to name order. A null cache\_policy\_id uses Managed-CachingOptimized. | <pre>map(object({<br/>    path_pattern           = string<br/>    origin                 = string<br/>    precedence             = number<br/>    viewer_protocol_policy = optional(string, "redirect-to-https")<br/>    allowed_methods        = optional(list(string), ["GET", "HEAD", "OPTIONS"])<br/>    cached_methods         = optional(list(string), ["GET", "HEAD"])<br/>    compress               = optional(bool, true)<br/><br/>    cache_policy_id            = optional(string)<br/>    origin_request_policy_id   = optional(string)<br/>    response_headers_policy_id = optional(string)<br/>  }))</pre> | `{}` | no |
+| default\_behaviour | Cache behaviour for everything not matched by an ordered behaviour. cache\_policy\_id is required. | <pre>object({<br/>    viewer_protocol_policy = optional(string, "redirect-to-https")<br/>    allowed_methods        = optional(list(string), ["GET", "HEAD", "OPTIONS"])<br/>    cached_methods         = optional(list(string), ["GET", "HEAD"])<br/>    compress               = optional(bool, true)<br/><br/>    cache_policy_id            = optional(string)<br/>    origin_request_policy_id   = optional(string)<br/>    response_headers_policy_id = optional(string)<br/><br/>    function_associations = optional(map(object({<br/>      event_type   = string<br/>      function_arn = string<br/>    })), {})<br/>  })</pre> | `{}` | no |
+| ordered\_behaviours | Path-specific behaviours keyed by a stable name. Lower precedence numbers are evaluated first, and equal precedences fall back to name order. Each needs a cache\_policy\_id. | <pre>map(object({<br/>    path_pattern           = string<br/>    origin                 = string<br/>    precedence             = number<br/>    viewer_protocol_policy = optional(string, "redirect-to-https")<br/>    allowed_methods        = optional(list(string), ["GET", "HEAD", "OPTIONS"])<br/>    cached_methods         = optional(list(string), ["GET", "HEAD"])<br/>    compress               = optional(bool, true)<br/><br/>    cache_policy_id            = optional(string)<br/>    origin_request_policy_id   = optional(string)<br/>    response_headers_policy_id = optional(string)<br/>  }))</pre> | `{}` | no |
 | price\_class | Which edge locations serve traffic. PriceClass\_100 is North America and Europe only and is much cheaper. | `string` | `"PriceClass_100"` | no |
 | web\_acl\_arn | WAF web ACL, which must have been created with CLOUDFRONT scope in us-east-1. | `string` | `null` | no |
 | default\_root\_object | Object served for a request to the root path. | `string` | `"index.html"` | no |

@@ -1,9 +1,9 @@
 locals {
   create_parameter_group = length(var.parameters) > 0
   failover_possible      = var.replicas_per_node_group > 0
-  cluster_mode           = var.num_node_groups > 1
+  cluster_mode           = var.cluster_mode_enabled
 
-  # Sharding needs cluster-enabled, which the plain default parameter group turns off.
+  # Cluster mode needs cluster-enabled, which the plain default parameter group turns off.
   parameters = local.cluster_mode ? merge(var.parameters, { cluster-enabled = "yes" }) : var.parameters
 
   parameter_group_name = (
@@ -104,7 +104,7 @@ resource "aws_elasticache_replication_group" "this" {
 
     precondition {
       condition     = !local.cluster_mode || var.parameter_group_family != null
-      error_message = "More than one node group needs parameter_group_family, such as valkey8, so the module can choose a parameter group with cluster-enabled on."
+      error_message = "Cluster mode needs parameter_group_family, such as valkey8, so the module can choose a parameter group with cluster-enabled on."
     }
   }
 }

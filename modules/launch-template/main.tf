@@ -1,11 +1,13 @@
 locals {
   tags = merge(var.tags, { Name = var.name })
 
-  root_device_name = coalesce(var.root_volume.device_name, data.aws_ami.this.root_device_name)
+  root_device_name = coalesce(var.root_volume.device_name, one(data.aws_ami.this[*].root_device_name))
 }
 
-# The root device name differs between AMI families, so it is read from the image.
+# The root device name differs between AMI families, so it is read from the image unless the caller names it.
 data "aws_ami" "this" {
+  count = var.root_volume.device_name == null ? 1 : 0
+
   include_deprecated = true
 
   filter {

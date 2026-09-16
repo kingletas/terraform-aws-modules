@@ -73,6 +73,43 @@ run "accepts_valid_tag_keys_with_metadata_tags_on" {
   }
 }
 
+run "refuses_a_bad_provider_default_tag_key_with_metadata_tags_on" {
+  command = plan
+
+  variables {
+    instance_metadata_tags = true
+  }
+
+  override_data {
+    target = data.aws_default_tags.current
+    values = {
+      tags = { "cost center" = "plan-test" }
+    }
+  }
+
+  expect_failures = [aws_instance.this]
+}
+
+run "accepts_valid_provider_default_tag_keys_with_metadata_tags_on" {
+  command = plan
+
+  variables {
+    instance_metadata_tags = true
+  }
+
+  override_data {
+    target = data.aws_default_tags.current
+    values = {
+      tags = { CostCenter = "plan-test" }
+    }
+  }
+
+  assert {
+    condition     = aws_instance.this["plan-test-admin-01"].metadata_options[0].instance_metadata_tags == "enabled"
+    error_message = "Valid default tag keys should let metadata tags turn on."
+  }
+}
+
 run "builds_an_instance_holding_a_volume" {
   command = apply
 

@@ -36,6 +36,7 @@ run "uses_the_cluster_default_parameter_group_when_sharded" {
   command = plan
 
   variables {
+    cluster_mode_enabled   = true
     num_node_groups        = 3
     parameter_group_family = "valkey8"
   }
@@ -50,6 +51,7 @@ run "turns_cluster_mode_on_in_its_own_parameter_group_when_sharded" {
   command = plan
 
   variables {
+    cluster_mode_enabled   = true
     num_node_groups        = 2
     parameter_group_family = "valkey8"
     parameters             = { maxmemory-policy = "volatile-lru" }
@@ -61,12 +63,52 @@ run "turns_cluster_mode_on_in_its_own_parameter_group_when_sharded" {
   }
 }
 
-run "refuses_sharding_without_a_family" {
+run "refuses_cluster_mode_without_a_family" {
   command = plan
 
   variables {
-    num_node_groups = 2
+    cluster_mode_enabled = true
+    num_node_groups      = 2
   }
 
   expect_failures = [aws_elasticache_replication_group.this]
+}
+
+run "runs_a_single_shard_in_cluster_mode" {
+  command = plan
+
+  variables {
+    cluster_mode_enabled   = true
+    parameter_group_family = "valkey8"
+  }
+
+  assert {
+    condition     = local.parameter_group_name == "default.valkey8.cluster.on" && aws_elasticache_replication_group.this.num_node_groups == 1
+    error_message = "One shard in cluster mode should use the cluster-mode default group."
+  }
+}
+
+run "keeps_cluster_mode_off_when_not_asked" {
+  command = plan
+
+  variables {
+    parameter_group_family = "valkey8"
+    parameters             = { maxmemory-policy = "volatile-lru" }
+  }
+
+  assert {
+    condition     = !contains([for parameter in aws_elasticache_parameter_group.this[0].parameter : parameter.name], "cluster-enabled")
+    error_message = "A group without cluster mode should not set cluster-enabled."
+  }
+}
+
+run "refuses_several_shards_without_cluster_mode" {
+  command = plan
+
+  variables {
+    num_node_groups        = 2
+    parameter_group_family = "valkey8"
+  }
+
+  expect_failures = [var.num_node_groups]
 }

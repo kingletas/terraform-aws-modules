@@ -67,7 +67,7 @@ variable "connection" {
 
 variable "ssm_bucket_name" {
   type        = string
-  description = "S3 bucket the SSM connection transfers files through. The aws_ssm connection plugin moves every module it runs through this bucket, not only copied files, so a playbook over SSM needs it. The instance role and the runner both need access to it."
+  description = "S3 bucket the SSM connection transfers files through. The aws_ssm connection plugin moves every module it runs through this bucket, not only copied files, so a playbook over SSM needs it. Only the machine running Ansible needs access to it; nodes fetch through presigned URLs."
   default     = null
 }
 

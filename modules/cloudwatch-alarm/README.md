@@ -41,6 +41,7 @@ An alarm on "more than 50 errors" fires during a traffic spike where the error *
 - **`treat_missing_data` decides what silence means.** A queue that stops receiving produces no datapoints, and with the default `missing` the alarm moves to `INSUFFICIENT_DATA` rather than alarming. Choose deliberately: `notBreaching` for a metric that legitimately goes quiet, `breaching` for a heartbeat.
 - `datapoints_to_alarm` below `evaluation_periods` gives an M-of-N alarm, which rides out a single bad interval without ignoring a real trend.
 - An alarm with no `alarm_actions` or `ok_actions` of its own uses `default_alarm_actions` and `default_ok_actions`. **Set the OK actions.** An alarm that never says it recovered leaves someone checking by hand.
+- **The evaluation window is capped.** `period` times `evaluation_periods` may not exceed one day (86400 seconds), or one hour for a high-resolution period under 60 seconds. For a `metric_query` alarm the check uses each metric query's `period`. The module refuses a longer window at plan, where CloudWatch would refuse it at apply.
 - `actions_enabled = false` silences every alarm in the module while you tune thresholds, without deleting them.
 
 <!-- BEGIN_TF_DOCS -->

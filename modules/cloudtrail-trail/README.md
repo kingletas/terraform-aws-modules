@@ -73,7 +73,7 @@ A single-region trail records nothing about the regions you are not watching, wh
 | data\_events | Data event selectors keyed by a stable name, for object-level S3 or Lambda invocation logging. read\_write\_type is All, ReadOnly or WriteOnly. These are billed per event and a busy bucket generates a great many. | <pre>map(object({<br/>    resource_type   = string<br/>    resource_values = list(string)<br/>    read_write_type = optional(string, "All")<br/>  }))</pre> | `{}` | no |
 | include\_management\_events | Record management events, the control-plane calls that change the account. Turning this off leaves only the data events. | `bool` | `true` | no |
 | management\_events\_read\_write\_type | Which management events to record: All, ReadOnly or WriteOnly. | `string` | `"All"` | no |
-| insight\_types | Insight types to detect unusual activity: ApiCallRateInsight, ApiErrorRateInsight. | `list(string)` | `[]` | no |
+| insight\_types | Insight types to detect unusual activity: ApiCallRateInsight, ApiErrorRateInsight. Needs write management events recorded. | `list(string)` | `[]` | no |
 | tags | Tags applied to the trail. | `map(string)` | `{}` | no |
 
 ### Outputs

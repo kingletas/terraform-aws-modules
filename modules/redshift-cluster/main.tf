@@ -96,8 +96,6 @@ resource "aws_redshift_cluster" "this" {
   }
 }
 
-# Provider 6 configures audit logging with this separate resource rather than an
-# inline block on the cluster.
 resource "aws_redshift_logging" "this" {
   count = var.logging == null ? 0 : 1
 

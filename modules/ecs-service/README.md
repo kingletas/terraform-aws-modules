@@ -61,7 +61,15 @@ A missing execution role shows up as a task that never starts, with the reason b
 - `cpu_architecture` is `X86_64` by default. Set `ARM64` for Graviton, and build every container image for the architecture you choose.
 - `readonly_root_filesystem` defaults to true. An application that writes to disk needs a volume or an explicit false.
 - With `autoscaling` set, `desired_count` is only the starting count and the scaler owns it afterwards. Without it, changing `desired_count` changes the running count.
-- The service with autoscaling and the service without it are separate resources in the module. **Adding or removing `autoscaling` on an existing service replaces the service**, so decide before the first apply or plan for the replacement.
+- The service with autoscaling and the service without it are separate resources in the module, `aws_ecs_service.this[0]` and `aws_ecs_service.autoscaled[0]`. **Adding or removing `autoscaling` on an existing service replaces the service**, and the replacement fails because ECS will not create a service while the old one with the same name is still draining. To switch in place, add a `moved` block to the calling configuration in the same apply that changes `autoscaling`, then remove it once applied:
+
+    ```hcl
+    # Turning autoscaling on. Swap from and to when turning it off.
+    moved {
+      from = module.api.aws_ecs_service.this[0]
+      to   = module.api.aws_ecs_service.autoscaled[0]
+    }
+    ```
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements

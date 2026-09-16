@@ -44,6 +44,7 @@ module "public" {
 - **The port 80 listener is optional.** `create_http_listener = false` drops it, for a load balancer that only accepts HTTPS (from CloudFront, for example). At least one of the two listeners must stay on. While HTTPS is on, port 80 answers with a permanent redirect unless `redirect_http_to_https = false`.
 - **Traffic that matches no rule** goes to `default_target_group`, or gets `default_fixed_response` when that is set. One of the two is required. With a rule on `http_headers`, only requests carrying a shared header reach a target group, which is how an origin behind CloudFront refuses direct traffic.
 - Listener rules attach to the HTTPS listener, or to the HTTP listener when HTTPS is off. Each rule names one of the `target_groups` and needs at least one of `host_headers`, `path_patterns` or `http_headers`. Rules are evaluated in `priority` order, lowest first. Leave gaps so a rule can be inserted later.
+- **The outputs describe what the listener does**, so a caller's test can check it at plan. `https_listener_default_action` gives the default action's type and fixed-response status. `listener_rules` gives each rule's priority, action, target group key, host headers, path patterns and header names. Header values are left out, since they are usually a shared secret.
 - `additional_certificate_arns` is a map keyed by a stable name, so certificates created in the same plan can be attached.
 - A target group's name is the load balancer name and the key, truncated, plus a short hash of the settings that force a replacement (VPC, port, protocol, protocol version, target type). A replacement therefore gets a new name and can be created before the old group is destroyed, and two long keys sharing a prefix still differ.
 - `deregistration_delay` is how long the load balancer waits for in-flight requests before removing a target. Lower it for fast deploys, raise it for long requests.
@@ -111,4 +112,6 @@ module "public" {
 | target\_group\_arn\_suffixes | Target group ARN suffixes, for CloudWatch metric dimensions. |
 | https\_listener\_arn | ARN of the HTTPS listener, or null when create\_https\_listener is off. |
 | http\_listener\_arn | ARN of the HTTP listener, or null when create\_http\_listener is off. |
+| https\_listener\_default\_action | What the HTTPS listener does with a request no rule matches: type is forward or fixed-response, and status\_code is the fixed response's status, else null. Null when create\_https\_listener is off. |
+| listener\_rules | Listener rules keyed by name: priority, action type, target group key, and the host, path and header names each rule matches on. Header values are left out because they are often a shared secret. |
 <!-- END_TF_DOCS -->

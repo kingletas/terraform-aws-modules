@@ -28,7 +28,8 @@ module "app_template" {
 
 ## Notes
 
-- **The root device name is read from the AMI**, because it differs between image families (`/dev/xvda` on Amazon Linux, `/dev/sda1` on Ubuntu) and a wrong name adds a second disk instead of configuring the root. Set `root_volume.device_name` only to override it. The identity running Terraform must be able to describe the image.
+- **The root device name is read from the AMI**, because it differs between image families (`/dev/xvda` on Amazon Linux, `/dev/sda1` on Ubuntu) and a wrong name adds a second disk instead of configuring the root. Set `root_volume.device_name` to override it, and the module then skips the lookup. Without it, the identity running Terraform must be able to describe the image.
+- **An `image_id` of `resolve:ssm:/aws/service/...` is resolved by EC2 at launch**, so there is no image to look up at plan. It needs `root_volume.device_name`.
 - `user_data` is passed unencoded; the module base64-encodes it.
 - Setting `instance_requirements` lets AWS pick any instance type that fits, which is how you get spot capacity from a wide pool. It replaces `instance_type`. The instance architecture follows the AMI, so choose an arm64 image for Graviton types.
 - `instance_metadata_tags` is off by default. Turn it on to read tags from the metadata service; AWS then refuses tag keys containing anything other than letters, digits and `+ - = . , _ : @`, and the plan checks this.
@@ -60,14 +61,14 @@ module "app_template" {
 | ---- | ----------- | ---- | ------- | :------: |
 | name | Name prefix for the launch template. | `string` | n/a | yes |
 | description | What instances from this template are for. | `string` | `null` | no |
-| image\_id | AMI to launch. Resolve it from a data source in the caller so the template never pins a stale image. | `string` | n/a | yes |
+| image\_id | AMI to launch, or a resolve:ssm: parameter reference that EC2 resolves at launch. Resolve an AMI from a data source in the caller so the template never pins a stale image. | `string` | n/a | yes |
 | instance\_type | Default instance type. An autoscaling group with a mixed instances policy overrides this. | `string` | `"t3.small"` | no |
 | key\_name | EC2 key pair for SSH. Prefer Session Manager and leave this null. | `string` | `null` | no |
 | security\_group\_ids | Security groups applied to the primary network interface. | `list(string)` | `[]` | no |
 | iam\_instance\_profile\_arn | IAM instance profile ARN. Needed for Session Manager and for anything calling AWS APIs. | `string` | `null` | no |
 | user\_data | Cloud-init user data, unencoded. The module base64-encodes it. | `string` | `null` | no |
 | associate\_public\_ip\_address | Give instances a public IP. Off by default. | `bool` | `false` | no |
-| root\_volume | Root volume settings. Always encrypted. device\_name defaults to the AMI's own root device, which is /dev/xvda on Amazon Linux and /dev/sda1 on Ubuntu; a wrong name adds a second disk instead of configuring the root. | <pre>object({<br/>    device_name           = optional(string)<br/>    type                  = optional(string, "gp3")<br/>    size                  = optional(number, 20)<br/>    iops                  = optional(number)<br/>    throughput            = optional(number)<br/>    delete_on_termination = optional(bool, true)<br/>  })</pre> | `{}` | no |
+| root\_volume | Root volume settings. Always encrypted. device\_name defaults to the AMI's own root device, which is /dev/xvda on Amazon Linux and /dev/sda1 on Ubuntu; a wrong name adds a second disk instead of configuring the root. Required when image\_id is a resolve:ssm: reference. | <pre>object({<br/>    device_name           = optional(string)<br/>    type                  = optional(string, "gp3")<br/>    size                  = optional(number, 20)<br/>    iops                  = optional(number)<br/>    throughput            = optional(number)<br/>    delete_on_termination = optional(bool, true)<br/>  })</pre> | `{}` | no |
 | extra\_volumes | Additional block devices keyed by a stable name. | <pre>map(object({<br/>    device_name           = string<br/>    size                  = number<br/>    type                  = optional(string, "gp3")<br/>    iops                  = optional(number)<br/>    throughput            = optional(number)<br/>    delete_on_termination = optional(bool, false)<br/>  }))</pre> | `{}` | no |
 | kms\_key\_id | KMS key for EBS encryption. Null uses the AWS-managed EBS key. | `string` | `null` | no |
 | detailed\_monitoring | Enable one-minute CloudWatch monitoring. | `bool` | `true` | no |

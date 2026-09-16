@@ -230,3 +230,89 @@ run "refuses_a_load_balancer_with_no_listener" {
 
   expect_failures = [aws_lb.this]
 }
+
+run "describes_listener_behaviour_in_outputs" {
+  command = plan
+
+  variables {
+    name                   = "plan-test"
+    default_fixed_response = { status_code = 403 }
+    target_groups = {
+      web   = { port = 80 }
+      admin = { port = 8080 }
+    }
+
+    listener_rules = {
+      admin = {
+        priority      = 10
+        target_group  = "admin"
+        host_headers  = ["admin.example.com"]
+        path_patterns = ["/admin/*"]
+      }
+      origin_verify = {
+        priority     = 20
+        target_group = "web"
+        http_headers = { "X-Origin-Verify" = ["plan-test-placeholder-value"] }
+      }
+    }
+  }
+
+  assert {
+    condition     = output.https_listener_default_action == { type = "fixed-response", status_code = 403 }
+    error_message = "The default action output must report the fixed response and its status."
+  }
+
+  assert {
+    condition     = keys(output.listener_rules) == ["admin", "origin_verify"] && alltrue([for rule in values(output.listener_rules) : rule.action == "forward"])
+    error_message = "Every listener rule must be reported by name with its action."
+  }
+
+  assert {
+    condition = (
+      output.listener_rules["admin"].target_group == "admin"
+      && output.listener_rules["admin"].host_headers == toset(["admin.example.com"])
+      && output.listener_rules["admin"].path_patterns == toset(["/admin/*"])
+      && length(output.listener_rules["admin"].http_headers) == 0
+    )
+    error_message = "A host and path rule must report its target group and both conditions."
+  }
+
+  assert {
+    condition = (
+      output.listener_rules["origin_verify"].target_group == "web"
+      && output.listener_rules["origin_verify"].http_headers == toset(["X-Origin-Verify"])
+      && length(output.listener_rules["origin_verify"].host_headers) == 0
+    )
+    error_message = "A header rule must report the header name it requires."
+  }
+}
+
+run "reports_a_forwarding_default_action_with_no_status" {
+  command = plan
+
+  variables {
+    name                 = "plan-test"
+    default_target_group = "web"
+  }
+
+  assert {
+    condition     = output.https_listener_default_action == { type = "forward", status_code = null } && length(output.listener_rules) == 0
+    error_message = "A forwarding default must report no status code, and no rules must mean an empty map."
+  }
+}
+
+run "reports_no_default_action_without_https" {
+  command = plan
+
+  variables {
+    name                  = "plan-test"
+    default_target_group  = "web"
+    create_https_listener = false
+    certificate_arn       = null
+  }
+
+  assert {
+    condition     = output.https_listener_default_action == null
+    error_message = "With HTTPS off the default action output must be null."
+  }
+}

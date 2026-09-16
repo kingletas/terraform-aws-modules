@@ -51,7 +51,7 @@ Prefer BGP where the far side can speak it.
 ## Notes
 
 - The pre-shared keys are in `customer_gateway_configuration`, which is marked sensitive. Hand it to the far side out of band, never in a ticket.
-- Leaving `tunnel_preshared_keys` empty lets AWS generate them, which keeps them out of Terraform state.
+- Leaving `tunnel_preshared_keys` empty lets AWS generate them, which keeps them out of your configuration but not out of Terraform state. The provider reads the generated keys back into state as `tunnel1_preshared_key` and `tunnel2_preshared_key`, and they also appear in `customer_gateway_configuration`. Treat the state as holding the keys either way, and keep it encrypted with access restricted.
 - `tunnel_inside_cidrs` must come from `169.254.0.0/16` and must not collide with any other tunnel on the same gateway.
 - Tunnel logging is what tells you why a tunnel dropped. Without it, a flapping tunnel is invisible.
 
@@ -97,7 +97,7 @@ Prefer BGP where the far side can speak it.
 | local\_ipv4\_network\_cidr | CIDR on the far side allowed inside the tunnel. | `string` | `"0.0.0.0/0"` | no |
 | remote\_ipv4\_network\_cidr | CIDR on the AWS side allowed inside the tunnel. | `string` | `"0.0.0.0/0"` | no |
 | tunnel\_inside\_cidrs | The /30 ranges for each tunnel's inside addresses. Empty lets AWS choose. Must come from 169.254.0.0/16. | `list(string)` | `[]` | no |
-| tunnel\_preshared\_keys | Pre-shared keys for each tunnel. Empty lets AWS generate them, which keeps them out of Terraform state. | `list(string)` | `[]` | no |
+| tunnel\_preshared\_keys | Pre-shared keys for each tunnel. Empty lets AWS generate them. Either way the keys are stored in Terraform state. | `list(string)` | `[]` | no |
 | vpn\_gateway\_propagation\_route\_tables | VPC route tables that learn routes from the virtual private gateway, keyed by a stable name. Only with vpn\_gateway. | `map(string)` | `{}` | no |
 | transit\_gateway\_association | Transit gateway route table the VPN attachment looks up routes in. Only with transit\_gateway\_id, and not when the gateway associates new attachments with its default table. Null leaves the attachment unassociated. | <pre>object({<br/>    route_table_id = string<br/>  })</pre> | `null` | no |
 | transit\_gateway\_propagation\_route\_tables | Transit gateway route tables that learn the far side's BGP routes, keyed by a stable name. Only with transit\_gateway\_id. | `map(string)` | `{}` | no |

@@ -19,6 +19,9 @@ resource "aws_dms_replication_subnet_group" "this" {
   subnet_ids                           = var.subnet_ids
 
   tags = local.tags
+
+  # DMS refuses to create a subnet group until dms-vpc-role exists with its policy.
+  depends_on = [aws_iam_role_policy_attachment.dms_vpc]
 }
 
 resource "aws_dms_replication_instance" "this" {
@@ -72,6 +75,9 @@ resource "aws_dms_endpoint" "this" {
   ])))
 
   tags = merge(var.tags, { Name = format("%s-%s", var.name, each.key) })
+
+  # A Redshift endpoint checks for dms-access-for-endpoint when it is created.
+  depends_on = [aws_iam_role_policy_attachment.dms_access_for_endpoint]
 }
 
 resource "aws_dms_replication_task" "this" {

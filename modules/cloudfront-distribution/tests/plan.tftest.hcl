@@ -5,9 +5,10 @@ mock_provider "aws" {
 }
 
 variables {
-  comment        = "plan test"
-  origins        = { app = { domain_name = "origin.example.com" } }
-  default_origin = "app"
+  comment           = "plan test"
+  origins           = { app = { domain_name = "origin.example.com" } }
+  default_origin    = "app"
+  default_behaviour = { cache_policy_id = "plan-test-default-policy" }
 }
 
 run "orders_behaviours_by_precedence" {
@@ -15,10 +16,10 @@ run "orders_behaviours_by_precedence" {
 
   variables {
     ordered_behaviours = {
-      aaa_last   = { path_pattern = "/*.css", origin = "app", precedence = 30 }
-      zzz_first  = { path_pattern = "/static/*", origin = "app", precedence = 5 }
-      bbb_second = { path_pattern = "/media/*", origin = "app", precedence = 10 }
-      aaa_second = { path_pattern = "/api/*", origin = "app", precedence = 10 }
+      aaa_last   = { path_pattern = "/*.css", origin = "app", precedence = 30, cache_policy_id = "plan-test-own-policy" }
+      zzz_first  = { path_pattern = "/static/*", origin = "app", precedence = 5, cache_policy_id = "plan-test-own-policy" }
+      bbb_second = { path_pattern = "/media/*", origin = "app", precedence = 10, cache_policy_id = "plan-test-own-policy" }
+      aaa_second = { path_pattern = "/api/*", origin = "app", precedence = 10, cache_policy_id = "plan-test-own-policy" }
     }
   }
 
@@ -30,27 +31,46 @@ run "orders_behaviours_by_precedence" {
   }
 }
 
-# The looked-up policy ID is not computed in the provider schema, so a mock leaves it
-# null; this proves the lookup and that a caller's own policy wins.
-run "looks_up_caching_optimized_and_keeps_a_callers_policy" {
+run "sends_each_behaviours_own_cache_policy" {
+  command = plan
+
+  variables {
+    ordered_behaviours = {
+      api = { path_pattern = "/api/*", origin = "app", precedence = 2, cache_policy_id = "plan-test-own-policy" }
+    }
+  }
+
+  assert {
+    condition     = aws_cloudfront_distribution.this.default_cache_behavior[0].cache_policy_id == "plan-test-default-policy"
+    error_message = "The default behaviour must use the caller's cache policy."
+  }
+
+  assert {
+    condition     = aws_cloudfront_distribution.this.ordered_cache_behavior[0].cache_policy_id == "plan-test-own-policy"
+    error_message = "An ordered behaviour must use its own cache policy."
+  }
+}
+
+run "refuses_a_default_behaviour_without_a_cache_policy" {
+  command = plan
+
+  variables {
+    default_behaviour = {}
+  }
+
+  expect_failures = [var.default_behaviour]
+}
+
+run "refuses_an_ordered_behaviour_without_a_cache_policy" {
   command = plan
 
   variables {
     ordered_behaviours = {
       media = { path_pattern = "/media/*", origin = "app", precedence = 1 }
-      api   = { path_pattern = "/api/*", origin = "app", precedence = 2, cache_policy_id = "plan-test-own-policy" }
     }
   }
 
-  assert {
-    condition     = data.aws_cloudfront_cache_policy.caching_optimized.name == "Managed-CachingOptimized"
-    error_message = "The fallback must be the Managed-CachingOptimized policy."
-  }
-
-  assert {
-    condition     = aws_cloudfront_distribution.this.ordered_cache_behavior[1].cache_policy_id == "plan-test-own-policy"
-    error_message = "A behaviour's own cache policy must win over the fallback."
-  }
+  expect_failures = [var.ordered_behaviours]
 }
 
 run "refuses_a_fractional_precedence" {
@@ -58,7 +78,7 @@ run "refuses_a_fractional_precedence" {
 
   variables {
     ordered_behaviours = {
-      media = { path_pattern = "/media/*", origin = "app", precedence = 1.5 }
+      media = { path_pattern = "/media/*", origin = "app", precedence = 1.5, cache_policy_id = "plan-test-own-policy" }
     }
   }
 

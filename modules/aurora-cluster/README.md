@@ -36,6 +36,8 @@ module "database" {
 - **Serverless v2 is `engine_mode = "provisioned"` with instance class `db.serverless`.** The old `serverless` engine mode is v1, which is a different product.
 - `promotion_tier` decides who is promoted on failover. Lower wins.
 - Aurora storage grows automatically and is billed for what is used. There is no `allocated_storage` to set.
+- Enhanced monitoring is on every 60 seconds, through an IAM role the module creates for RDS. Set `monitoring_interval = 0` to turn it off, and no role is created.
+- `skip_final_snapshot` is off, so a destroy leaves a snapshot to restore from. It is named `<name>-final`, with no timestamp, and the name is set even while the skip is on, so turning the skip off later needs no other change. A second destroy under the same name fails while that snapshot exists: delete or rename it first.
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements
@@ -56,6 +58,8 @@ module "database" {
 | Name | Type |
 | ---- | ---- |
 | [aws_db_subnet_group.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/db_subnet_group) | resource |
+| [aws_iam_role.monitoring](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
+| [aws_iam_role_policy_attachment.monitoring](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
 | [aws_rds_cluster.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/rds_cluster) | resource |
 | [aws_rds_cluster_instance.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/rds_cluster_instance) | resource |
 | [aws_rds_cluster_parameter_group.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/rds_cluster_parameter_group) | resource |
@@ -85,6 +89,7 @@ module "database" {
 | parameter\_group\_family | Parameter group family, such as aurora-postgresql16. Required when cluster\_parameters is non-empty. | `string` | `null` | no |
 | enabled\_cloudwatch\_logs\_exports | Log types shipped to CloudWatch. | `list(string)` | `[]` | no |
 | performance\_insights\_enabled | Turn on Performance Insights on every instance. | `bool` | `true` | no |
+| monitoring\_interval | Enhanced monitoring interval in seconds for every instance. Zero disables it and creates no monitoring role. | `number` | `60` | no |
 | iam\_database\_authentication\_enabled | Allow connecting with an IAM token instead of a stored password. | `bool` | `true` | no |
 | deletion\_protection | Refuse to delete the cluster until this is turned off. | `bool` | `true` | no |
 | skip\_final\_snapshot | Delete without taking a final snapshot. | `bool` | `false` | no |

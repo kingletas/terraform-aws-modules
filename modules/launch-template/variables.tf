@@ -11,7 +11,12 @@ variable "description" {
 
 variable "image_id" {
   type        = string
-  description = "AMI to launch. Resolve it from a data source in the caller so the template never pins a stale image."
+  description = "AMI to launch, or a resolve:ssm: parameter reference that EC2 resolves at launch. Resolve an AMI from a data source in the caller so the template never pins a stale image."
+
+  validation {
+    condition     = !startswith(var.image_id, "resolve:ssm:") || var.root_volume.device_name != null
+    error_message = "An image_id of resolve:ssm: cannot be looked up at plan, so set root_volume.device_name, such as /dev/xvda for Amazon Linux or /dev/sda1 for Ubuntu."
+  }
 }
 
 variable "instance_type" {
@@ -60,7 +65,7 @@ variable "root_volume" {
     throughput            = optional(number)
     delete_on_termination = optional(bool, true)
   })
-  description = "Root volume settings. Always encrypted. device_name defaults to the AMI's own root device, which is /dev/xvda on Amazon Linux and /dev/sda1 on Ubuntu; a wrong name adds a second disk instead of configuring the root."
+  description = "Root volume settings. Always encrypted. device_name defaults to the AMI's own root device, which is /dev/xvda on Amazon Linux and /dev/sda1 on Ubuntu; a wrong name adds a second disk instead of configuring the root. Required when image_id is a resolve:ssm: reference."
   default     = {}
 }
 

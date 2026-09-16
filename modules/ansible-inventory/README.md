@@ -79,7 +79,7 @@ That removes the need for a bastion host, and with it a host to patch, a key to 
 
 - **`discovery_tags` must not be empty**, because an inventory with no filter matches every running instance in the account.
 - Hosts are named by instance ID. Instances in an autoscaling group share a `Name` tag, and naming hosts by it would collapse them into one.
-- Over SSM, set `ssm_bucket_name`. The connection plugin moves every module it runs through that S3 bucket, not only copied files, so the instance role and the runner both need access to it.
+- Over SSM, set `ssm_bucket_name`. The connection plugin moves every module it runs through that S3 bucket, not only copied files. Only the runner needs access to it: the plugin uploads with the runner's credentials and the instance fetches through a presigned URL with `curl`, so the instance role needs no S3 permission.
 - Instances are also grouped by availability zone as `az_*`, which is what a rolling play uses to avoid taking a whole zone at once.
 - The module uses the AWS provider only to write the facts parameter. With `facts` empty it creates nothing in AWS, and `group_vars` may not set `terraform_facts` in the `all` group because the module writes that key.
 
@@ -118,7 +118,7 @@ That removes the need for a bastion host, and with it a host to patch, a key to 
 | group\_by\_tag | Tag whose value becomes the Ansible group. Role is the usual choice, and instance-fleet sets it. | `string` | `"Role"` | no |
 | ssh\_user | Default remote user, which varies by AMI family: ubuntu, ec2-user, admin, rocky. | `string` | `"ubuntu"` | no |
 | connection | How Ansible reaches a host.<br/><br/>`ssm` tunnels through Systems Manager: no bastion, no open port 22, no key<br/>to distribute, and it works for a host with no public address. It needs the<br/>SSM agent on the instance and the session-manager-plugin on the runner.<br/><br/>`ssh` connects directly, for an AMI without the agent. | `string` | `"ssm"` | no |
-| ssm\_bucket\_name | S3 bucket the SSM connection transfers files through. The aws\_ssm connection plugin moves every module it runs through this bucket, not only copied files, so a playbook over SSM needs it. The instance role and the runner both need access to it. | `string` | `null` | no |
+| ssm\_bucket\_name | S3 bucket the SSM connection transfers files through. The aws\_ssm connection plugin moves every module it runs through this bucket, not only copied files, so a playbook over SSM needs it. Only the machine running Ansible needs access to it; nodes fetch through presigned URLs. | `string` | `null` | no |
 | facts | Values every host should know: endpoints, bucket names and secret ARNs.<br/><br/>Written to SSM Parameter Store rather than to a file, so every operator and<br/>every CI runner reads the same values, and a stale local copy cannot exist. | `map(string)` | `{}` | no |
 | group\_vars | Variables per Ansible group, keyed by group name. Written as group\_vars files, which are configuration rather than state and belong in git. With facts set, group\_vars/all.yml also carries the terraform\_facts lookup. | `map(map(string))` | `{}` | no |
 | facts\_parameter\_tier | SSM parameter tier. Advanced raises the value limit to 8 KB and is billed monthly per parameter. | `string` | `"Standard"` | no |

@@ -62,8 +62,13 @@ variable "default_behaviour" {
       function_arn = string
     })), {})
   })
-  description = "Cache behaviour for everything not matched by an ordered behaviour. A null cache_policy_id uses Managed-CachingOptimized."
+  description = "Cache behaviour for everything not matched by an ordered behaviour. cache_policy_id is required."
   default     = {}
+
+  validation {
+    condition     = var.default_behaviour.cache_policy_id != null
+    error_message = "The default behaviour needs a cache_policy_id: Managed-CachingOptimized for a static origin, or Managed-CachingDisabled with an origin request policy for an application."
+  }
 }
 
 variable "ordered_behaviours" {
@@ -80,8 +85,13 @@ variable "ordered_behaviours" {
     origin_request_policy_id   = optional(string)
     response_headers_policy_id = optional(string)
   }))
-  description = "Path-specific behaviours keyed by a stable name. Lower precedence numbers are evaluated first, and equal precedences fall back to name order. A null cache_policy_id uses Managed-CachingOptimized."
+  description = "Path-specific behaviours keyed by a stable name. Lower precedence numbers are evaluated first, and equal precedences fall back to name order. Each needs a cache_policy_id."
   default     = {}
+
+  validation {
+    condition     = alltrue([for behaviour in values(var.ordered_behaviours) : behaviour.cache_policy_id != null])
+    error_message = "Every ordered behaviour needs a cache_policy_id: Managed-CachingOptimized for static content, or Managed-CachingDisabled with an origin request policy for an application."
+  }
 
   validation {
     condition = alltrue([

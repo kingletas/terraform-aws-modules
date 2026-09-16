@@ -64,7 +64,7 @@ Use cloud-init through `user_data` for anything that must happen at first boot, 
 ## Notes
 
 - `user_data_replace_on_change` is on. Changing user data replaces the instance, rather than leaving one running that no longer matches its own configuration.
-- `instance_metadata_tags` is off by default. Turn it on to read the instance's tags from the metadata service. AWS then refuses tag keys containing anything other than letters, digits and `+ - = . , _ : @` (so no spaces or slashes), and the plan checks this.
+- `instance_metadata_tags` is off by default. Turn it on to read the instance's tags from the metadata service. AWS then refuses tag keys containing anything other than letters, digits and `+ - = . , _ : @` (so no spaces or slashes), and the plan checks this, including the keys in the provider's `default_tags`.
 - `iops` and `throughput` are ignored for volume types that do not accept them, so you can leave them set while switching type.
 
 <!-- BEGIN_TF_DOCS -->

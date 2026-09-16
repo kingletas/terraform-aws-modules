@@ -15,11 +15,6 @@ locals {
   }
 }
 
-# The fallback cache policy, looked up by name so it resolves in every partition.
-data "aws_cloudfront_cache_policy" "caching_optimized" {
-  name = "Managed-CachingOptimized"
-}
-
 resource "aws_cloudfront_origin_access_control" "this" {
   for_each = local.oac_origins
 
@@ -88,7 +83,7 @@ resource "aws_cloudfront_distribution" "this" {
     cached_methods         = var.default_behaviour.cached_methods
     compress               = var.default_behaviour.compress
 
-    cache_policy_id            = var.default_behaviour.cache_policy_id != null ? var.default_behaviour.cache_policy_id : data.aws_cloudfront_cache_policy.caching_optimized.id
+    cache_policy_id            = var.default_behaviour.cache_policy_id
     origin_request_policy_id   = var.default_behaviour.origin_request_policy_id
     response_headers_policy_id = var.default_behaviour.response_headers_policy_id
 
@@ -113,7 +108,7 @@ resource "aws_cloudfront_distribution" "this" {
       cached_methods         = ordered_cache_behavior.value.cached_methods
       compress               = ordered_cache_behavior.value.compress
 
-      cache_policy_id            = ordered_cache_behavior.value.cache_policy_id != null ? ordered_cache_behavior.value.cache_policy_id : data.aws_cloudfront_cache_policy.caching_optimized.id
+      cache_policy_id            = ordered_cache_behavior.value.cache_policy_id
       origin_request_policy_id   = ordered_cache_behavior.value.origin_request_policy_id
       response_headers_policy_id = ordered_cache_behavior.value.response_headers_policy_id
     }

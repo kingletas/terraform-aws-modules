@@ -96,8 +96,13 @@ variable "management_events_read_write_type" {
 
 variable "insight_types" {
   type        = list(string)
-  description = "Insight types to detect unusual activity: ApiCallRateInsight, ApiErrorRateInsight."
+  description = "Insight types to detect unusual activity: ApiCallRateInsight, ApiErrorRateInsight. Needs write management events recorded."
   default     = []
+
+  validation {
+    condition     = length(var.insight_types) == 0 || (var.include_management_events && var.management_events_read_write_type != "ReadOnly")
+    error_message = "Insights need write management events: include_management_events true and management_events_read_write_type All or WriteOnly."
+  }
 }
 
 variable "tags" {

@@ -62,6 +62,9 @@ locals {
   ]...)
 }
 
+# Provider default tags reach the instances too, so the metadata tag key check reads them.
+data "aws_default_tags" "current" {}
+
 resource "aws_instance" "this" {
   # checkov:skip=CKV_AWS_126: detailed monitoring defaults true in the defaults object
   # checkov:skip=CKV_AWS_135: ebs_optimized defaults true in the defaults object
@@ -107,7 +110,7 @@ resource "aws_instance" "this" {
   lifecycle {
     precondition {
       condition = !var.instance_metadata_tags || alltrue([
-        for key in keys(merge(var.tags, each.value.tags, { Name = "", Role = "" })) :
+        for key in keys(merge(data.aws_default_tags.current.tags, var.tags, each.value.tags, { Name = "", Role = "" })) :
         can(regex("^[A-Za-z0-9+=.,_:@-]+$", key)) && !contains([".", "..", "_index"], key)
       ])
       error_message = "With instance_metadata_tags on, AWS refuses a tag key containing anything but letters, digits and + - = . , _ : @, or one that is ., .. or _index."

@@ -45,7 +45,9 @@ module "replication" {
 }
 ```
 
-> [!danger] `secrets_manager_endpoint_dns` is what makes a private task work
+> [!CAUTION]
+> **`secrets_manager_endpoint_dns` is what makes a private task work**
+>
 > An endpoint using `secret_arn` reads its credentials **at connection time, over the public Secrets Manager address**. In a private subnet with no route to the internet that request does not fail: **it hangs**, and the connection test times out with an error that never mentions Secrets Manager.
 >
 > Passing this variable sets `secretsManagerEndpointOverride` on every endpoint, pointing at your Secrets Manager VPC interface endpoint. Set it for any endpoint using `secret_arn` from a private subnet.

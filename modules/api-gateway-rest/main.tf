@@ -22,6 +22,14 @@ locals {
     }
   ]
 
+  # A top-level resource is keyed by its path as a route spells it, which is the key 0.2.0 stored it under.
+  level_1_keys = {
+    for prefix in keys(local.resource_levels[0]) : prefix => try(
+      sort([for route in var.routes : route.path if contains([prefix, "/${prefix}"], route.path)])[0],
+      prefix
+    )
+  }
+
   tags = merge(var.tags, { Name = var.name })
 }
 
@@ -49,7 +57,7 @@ resource "aws_api_gateway_rest_api" "this" {
 }
 
 resource "aws_api_gateway_resource" "level_1" {
-  for_each = local.resource_levels[0]
+  for_each = { for prefix, key in local.level_1_keys : key => local.resource_levels[0][prefix] }
 
   rest_api_id = aws_api_gateway_rest_api.this.id
   parent_id   = aws_api_gateway_rest_api.this.root_resource_id
@@ -60,7 +68,7 @@ resource "aws_api_gateway_resource" "level_2" {
   for_each = local.resource_levels[1]
 
   rest_api_id = aws_api_gateway_rest_api.this.id
-  parent_id   = aws_api_gateway_resource.level_1[each.value.parent].id
+  parent_id   = aws_api_gateway_resource.level_1[local.level_1_keys[each.value.parent]].id
   path_part   = each.value.path_part
 }
 
@@ -96,6 +104,7 @@ resource "aws_api_gateway_resource" "level_6" {
   path_part   = each.value.path_part
 }
 
+# Instance keys carry over unchanged, because level_1 keeps each path's 0.2.0 spelling.
 moved {
   from = aws_api_gateway_resource.this
   to   = aws_api_gateway_resource.level_1
@@ -104,7 +113,7 @@ moved {
 locals {
   resource_ids = merge(
     { "" = aws_api_gateway_rest_api.this.root_resource_id },
-    { for prefix, resource in aws_api_gateway_resource.level_1 : prefix => resource.id },
+    { for prefix, key in local.level_1_keys : prefix => aws_api_gateway_resource.level_1[key].id },
     { for prefix, resource in aws_api_gateway_resource.level_2 : prefix => resource.id },
     { for prefix, resource in aws_api_gateway_resource.level_3 : prefix => resource.id },
     { for prefix, resource in aws_api_gateway_resource.level_4 : prefix => resource.id },

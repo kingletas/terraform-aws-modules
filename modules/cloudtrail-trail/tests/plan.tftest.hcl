@@ -97,3 +97,45 @@ run "refuses_an_unknown_read_write_type" {
 
   expect_failures = [var.management_events_read_write_type]
 }
+
+run "plans_insights_with_write_management_events" {
+  command = plan
+
+  variables {
+    insight_types                     = ["ApiCallRateInsight"]
+    management_events_read_write_type = "WriteOnly"
+  }
+
+  assert {
+    condition     = [for selector in aws_cloudtrail.this.insight_selector : selector.insight_type] == ["ApiCallRateInsight"]
+    error_message = "A trail recording write management events should carry its insight selectors."
+  }
+}
+
+run "refuses_insights_with_read_only_management_events" {
+  command = plan
+
+  variables {
+    insight_types                     = ["ApiErrorRateInsight"]
+    management_events_read_write_type = "ReadOnly"
+  }
+
+  expect_failures = [var.insight_types]
+}
+
+run "refuses_insights_without_management_events" {
+  command = plan
+
+  variables {
+    insight_types             = ["ApiCallRateInsight"]
+    include_management_events = false
+    data_events = {
+      objects = {
+        resource_type   = "AWS::S3::Object"
+        resource_values = ["arn:aws:s3:::plan-test-data/"]
+      }
+    }
+  }
+
+  expect_failures = [var.insight_types]
+}

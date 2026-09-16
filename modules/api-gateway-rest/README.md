@@ -28,6 +28,9 @@ module "api" {
   }
 
   throttling_rate_limit = 200
+
+  # Set true in one stack per account and region, unless something else already sets API Gateway's CloudWatch role.
+  manage_account_cloudwatch_role = true
 }
 ```
 
@@ -48,6 +51,7 @@ This module hashes `openapi_body`, `routes` and `authorizers` into the deploymen
 - Every route must state its `authorization`: `NONE`, `AWS_IAM`, `CUSTOM` or `COGNITO_USER_POOLS`. `NONE` on a `REGIONAL` or `EDGE` endpoint is a public route.
 - Every route except a `MOCK` integration needs `lambda_invoke_arn` or `integration_uri`. The module does not grant API Gateway permission to invoke a Lambda function: add an `aws_lambda_permission` whose `source_arn` is built from the `arn` output (the API's execution ARN).
 - A route path can be up to six segments deep, such as `/orders/{id}/items`, and `/` attaches the method to the API root.
+- A top-level API resource is keyed by its path exactly as a route writes it, `orders` or `/orders`. Changing that spelling later replaces the resource and everything under it.
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements

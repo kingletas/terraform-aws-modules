@@ -41,8 +41,13 @@ run "builds_a_nested_resource_tree" {
   }
 
   assert {
-    condition     = keys(aws_api_gateway_resource.level_1) == ["orders"]
-    error_message = "The first level should hold one resource per distinct top segment."
+    condition     = keys(aws_api_gateway_resource.level_1) == ["/orders"]
+    error_message = "The first level should hold one resource per distinct top segment, keyed as the route spells it."
+  }
+
+  assert {
+    condition     = local.level_1_keys["orders"] == "/orders"
+    error_message = "The second level should find its parent under the top-level key."
   }
 
   assert {
@@ -73,6 +78,81 @@ run "builds_a_nested_resource_tree" {
   assert {
     condition     = length(aws_api_gateway_account.this) == 0
     error_message = "The account logging role is opt-in."
+  }
+}
+
+run "keys_top_level_paths_as_0_2_0_did" {
+  command = plan
+
+  variables {
+    routes = {
+      list_orders = {
+        path             = "orders"
+        method           = "GET"
+        authorization    = "NONE"
+        integration_type = "MOCK"
+      }
+      get_order = {
+        path             = "/orders/{id}"
+        method           = "GET"
+        authorization    = "NONE"
+        integration_type = "MOCK"
+      }
+      list_users = {
+        path             = "/users"
+        method           = "GET"
+        authorization    = "NONE"
+        integration_type = "MOCK"
+      }
+      reports = {
+        path             = "/reports/daily"
+        method           = "GET"
+        authorization    = "NONE"
+        integration_type = "MOCK"
+      }
+      health = {
+        path             = "/"
+        method           = "GET"
+        authorization    = "NONE"
+        integration_type = "MOCK"
+      }
+    }
+  }
+
+  assert {
+    condition     = keys(aws_api_gateway_resource.level_1) == ["/users", "orders", "reports"]
+    error_message = "A top-level path should keep the route's spelling, and a parent-only prefix should have no leading slash."
+  }
+
+  assert {
+    condition     = keys(aws_api_gateway_resource.level_2) == ["orders/{id}", "reports/daily"]
+    error_message = "Deeper levels should be keyed by the path without outer slashes."
+  }
+
+  override_resource {
+    target          = aws_api_gateway_resource.level_1["reports"]
+    override_during = plan
+    values = {
+      id = "reports0001"
+    }
+  }
+
+  override_resource {
+    target          = aws_api_gateway_rest_api.this
+    override_during = plan
+    values = {
+      root_resource_id = "root000001"
+    }
+  }
+
+  assert {
+    condition     = aws_api_gateway_resource.level_2["reports/daily"].parent_id == "reports0001"
+    error_message = "A second-level resource under a parent-only prefix should find its parent."
+  }
+
+  assert {
+    condition     = aws_api_gateway_method.this["health"].resource_id == "root000001"
+    error_message = "The root route should attach to the API root."
   }
 }
 

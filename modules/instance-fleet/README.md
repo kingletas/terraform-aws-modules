@@ -70,7 +70,7 @@ Instances are named `prefix-role-01` and upward, including a role with exactly o
 - **A replacement is destroy-first**, because an extra volume can be attached to one instance at a time: the old instance is stopped and destroyed, then the new one is built and given the same volumes. Expect a short gap while a node is replaced.
 - **Extra volumes outlive their instance.** Each takes its availability zone from the instance's subnet, so it survives a replacement, and it is never deleted with the instance. A volume is deleted only when you remove it from the role or remove its instance.
 - Every root and extra volume is **encrypted**, and **IMDSv2 is required** with a hop limit of 1.
-- `instance_metadata_tags` is off by default. Turn it on to read tags from the metadata service; AWS then refuses tag keys containing anything other than letters, digits and `+ - = . , _ : @`, and the plan checks every key a role would carry.
+- `instance_metadata_tags` is off by default. Turn it on to read tags from the metadata service; AWS then refuses tag keys containing anything other than letters, digits and `+ - = . , _ : @`, and the plan checks every key a role would carry, including the keys in the provider's `default_tags`.
 - `count = 0` removes a role cleanly, which is how a feature flag turns a whole tier off.
 - Outputs are grouped by role as well as by name (`by_role`, `private_ips_by_role`, `instance_ids_by_role`), because a downstream inventory, an SSM run command and a load balancer attachment all address a tier rather than a host.
 

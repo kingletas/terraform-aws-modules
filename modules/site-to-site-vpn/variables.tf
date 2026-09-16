@@ -71,7 +71,7 @@ variable "tunnel_inside_cidrs" {
 
 variable "tunnel_preshared_keys" {
   type        = list(string)
-  description = "Pre-shared keys for each tunnel. Empty lets AWS generate them, which keeps them out of Terraform state."
+  description = "Pre-shared keys for each tunnel. Empty lets AWS generate them. Either way the keys are stored in Terraform state."
   default     = []
   sensitive   = true
 }

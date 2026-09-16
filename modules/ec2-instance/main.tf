@@ -17,6 +17,9 @@ locals {
   ]...)
 }
 
+# Provider default tags reach the instance too, so the metadata tag key check reads them.
+data "aws_default_tags" "current" {}
+
 # A volume takes its zone from the subnet, which outlives any one instance, so replacing an instance keeps the volume.
 data "aws_subnet" "volume" {
   for_each = length(var.extra_volumes) > 0 ? local.instances : {}
@@ -67,7 +70,7 @@ resource "aws_instance" "this" {
   lifecycle {
     precondition {
       condition = !var.instance_metadata_tags || alltrue([
-        for key in keys(merge(var.tags, { Name = "" })) :
+        for key in keys(merge(data.aws_default_tags.current.tags, var.tags, { Name = "" })) :
         can(regex("^[A-Za-z0-9+=.,_:@-]+$", key)) && !contains([".", "..", "_index"], key)
       ])
       error_message = "With instance_metadata_tags on, AWS refuses a tag key containing anything but letters, digits and + - = . , _ : @, or one that is ., .. or _index."

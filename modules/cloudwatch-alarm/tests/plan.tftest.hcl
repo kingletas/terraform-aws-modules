@@ -71,3 +71,92 @@ run "refuses_a_maths_alarm_returning_two_series" {
 
   expect_failures = [var.alarms]
 }
+
+run "accepts_a_one_day_evaluation_window" {
+  command = plan
+
+  variables {
+    alarms = {
+      plan-test-daily = {
+        metric_name         = "CPUUtilization"
+        namespace           = "AWS/EC2"
+        comparison_operator = "GreaterThanThreshold"
+        threshold           = 80
+        period              = 3600
+        evaluation_periods  = 24
+      }
+
+      plan-test-high-resolution = {
+        metric_name         = "CPUUtilization"
+        namespace           = "AWS/EC2"
+        comparison_operator = "GreaterThanThreshold"
+        threshold           = 80
+        period              = 10
+        evaluation_periods  = 360
+      }
+    }
+  }
+
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.this["plan-test-daily"].evaluation_periods == 24
+    error_message = "An evaluation window of exactly one day must plan."
+  }
+}
+
+run "refuses_an_evaluation_window_over_one_day" {
+  command = plan
+
+  variables {
+    alarms = {
+      plan-test-daily = {
+        metric_name         = "CPUUtilization"
+        namespace           = "AWS/EC2"
+        comparison_operator = "GreaterThanThreshold"
+        threshold           = 80
+        period              = 3600
+        evaluation_periods  = 25
+      }
+    }
+  }
+
+  expect_failures = [var.alarms]
+}
+
+run "refuses_a_high_resolution_window_over_one_hour" {
+  command = plan
+
+  variables {
+    alarms = {
+      plan-test-high-resolution = {
+        metric_name         = "CPUUtilization"
+        namespace           = "AWS/EC2"
+        comparison_operator = "GreaterThanThreshold"
+        threshold           = 80
+        period              = 30
+        evaluation_periods  = 121
+      }
+    }
+  }
+
+  expect_failures = [var.alarms]
+}
+
+run "refuses_a_maths_alarm_whose_metric_window_is_over_one_day" {
+  command = plan
+
+  variables {
+    alarms = {
+      plan-test-error-rate = {
+        comparison_operator = "GreaterThanThreshold"
+        threshold           = 5
+        evaluation_periods  = 2
+        metric_query = [
+          { id = "errors", metric_name = "5XXError", namespace = "AWS/ApiGateway", stat = "Sum", period = 86400 },
+          { id = "rate", expression = "errors * 100", label = "5xx rate", return_data = true },
+        ]
+      }
+    }
+  }
+
+  expect_failures = [var.alarms]
+}

@@ -52,6 +52,19 @@ variable "alarms" {
   }
 
   validation {
+    condition = alltrue(flatten([
+      for name, alarm in var.alarms : [
+        for period in concat(
+          alarm.metric_query == null ? [alarm.period] : [],
+          [for query in coalesce(alarm.metric_query, []) : query.period if query.metric_name != null],
+        ) :
+        period * alarm.evaluation_periods <= (period < 60 ? 3600 : 86400)
+      ]
+    ]))
+    error_message = "Each alarm's period times evaluation_periods must be at most 86400 seconds, or 3600 seconds for a period under 60. CloudWatch refuses a longer evaluation window."
+  }
+
+  validation {
     condition = alltrue([
       for name, alarm in var.alarms :
       contains(["missing", "notBreaching", "breaching", "ignore"], alarm.treat_missing_data)

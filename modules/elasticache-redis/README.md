@@ -23,7 +23,8 @@ module "cache" {
 
 ## Notes
 
-- **Cluster mode is implied by `num_node_groups` above 1**, and it changes which endpoint you use: `configuration_endpoint_address` rather than `primary_endpoint_address`. Client libraries need to be told they are talking to a cluster. It also needs `parameter_group_family` (such as `valkey8`), because cluster mode needs a parameter group with `cluster-enabled` on: the module uses the family's `default.<family>.cluster.on` group, or sets `cluster-enabled` in its own group when you pass `parameters`.
+- **Cluster mode is `cluster_mode_enabled = true`**, and `num_node_groups` above 1 requires it. A single shard can run in cluster mode too, so it can add shards later. Cluster mode changes which endpoint you use: `configuration_endpoint_address` rather than `primary_endpoint_address`. Client libraries need to be told they are talking to a cluster. It also needs `parameter_group_family` (such as `valkey8`), because cluster mode needs a parameter group with `cluster-enabled` on: the module uses the family's `default.<family>.cluster.on` group, or sets `cluster-enabled` in its own group when you pass `parameters`.
+- **Changing `cluster_mode_enabled` on an existing group is not something a plan can do.** AWS moves a group into cluster mode only through its own online migration, first to compatible mode and then to enabled, and it cannot turn cluster mode off again. Run that migration in AWS, then set the variable to match.
 - The parameter group the module creates is named after the family, so changing `parameter_group_family` builds a new group before the old one is removed.
 - Automatic failover needs at least one replica. With `replicas_per_node_group = 0` the module turns it off rather than failing.
 - `engine` defaults to `valkey`, which is the fork most of the ecosystem moved to and is cheaper per node than Redis.
@@ -58,13 +59,14 @@ module "cache" {
 | engine | redis or valkey. Valkey is the fork most of the ecosystem moved to and is cheaper per node. | `string` | `"valkey"` | no |
 | engine\_version | Engine version. Leave null to take the current default. | `string` | `null` | no |
 | node\_type | Node type, such as cache.t4g.micro. | `string` | `"cache.t4g.micro"` | no |
-| num\_node\_groups | Number of shards. More than one turns on cluster mode, which most client libraries need to be told about, and needs parameter\_group\_family so a cluster-enabled parameter group is used. | `number` | `1` | no |
+| cluster\_mode\_enabled | Run the group in cluster mode, which most client libraries need to be told about. Needs parameter\_group\_family so a cluster-enabled parameter group is used. Changing it on an existing group is an AWS migration, not a plan. | `bool` | `false` | no |
+| num\_node\_groups | Number of shards. More than one needs cluster\_mode\_enabled. | `number` | `1` | no |
 | replicas\_per\_node\_group | Read replicas per shard. At least one is needed for automatic failover. | `number` | `1` | no |
 | subnet\_ids | Subnets for the cache subnet group. Private subnets in at least two availability zones. | `list(string)` | n/a | yes |
 | security\_group\_ids | Security groups controlling who may connect. | `list(string)` | `[]` | no |
 | port | Port to listen on. | `number` | `6379` | no |
 | parameters | Engine parameters. A parameter group is created only when this is non-empty. | `map(string)` | `{}` | no |
-| parameter\_group\_family | Parameter group family, such as valkey8. Required when parameters is non-empty or num\_node\_groups is above 1. | `string` | `null` | no |
+| parameter\_group\_family | Parameter group family, such as valkey8. Required when parameters is non-empty or cluster\_mode\_enabled is true. | `string` | `null` | no |
 | automatic\_failover\_enabled | Promote a replica when the primary fails. Needs at least one replica. | `bool` | `true` | no |
 | multi\_az\_enabled | Place replicas in other availability zones. Needs automatic failover. | `bool` | `true` | no |
 | at\_rest\_encryption\_enabled | Encrypt data on disk. | `bool` | `true` | no |

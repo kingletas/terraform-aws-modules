@@ -26,10 +26,21 @@ variable "node_type" {
   default     = "cache.t4g.micro"
 }
 
+variable "cluster_mode_enabled" {
+  type        = bool
+  description = "Run the group in cluster mode, which most client libraries need to be told about. Needs parameter_group_family so a cluster-enabled parameter group is used. Changing it on an existing group is an AWS migration, not a plan."
+  default     = false
+}
+
 variable "num_node_groups" {
   type        = number
-  description = "Number of shards. More than one turns on cluster mode, which most client libraries need to be told about, and needs parameter_group_family so a cluster-enabled parameter group is used."
+  description = "Number of shards. More than one needs cluster_mode_enabled."
   default     = 1
+
+  validation {
+    condition     = var.num_node_groups <= 1 || var.cluster_mode_enabled
+    error_message = "More than one node group needs cluster_mode_enabled = true."
+  }
 }
 
 variable "replicas_per_node_group" {
@@ -68,7 +79,7 @@ variable "parameters" {
 
 variable "parameter_group_family" {
   type        = string
-  description = "Parameter group family, such as valkey8. Required when parameters is non-empty or num_node_groups is above 1."
+  description = "Parameter group family, such as valkey8. Required when parameters is non-empty or cluster_mode_enabled is true."
   default     = null
 }
 

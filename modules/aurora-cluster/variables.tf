@@ -141,6 +141,17 @@ variable "performance_insights_enabled" {
   default     = true
 }
 
+variable "monitoring_interval" {
+  type        = number
+  description = "Enhanced monitoring interval in seconds for every instance. Zero disables it and creates no monitoring role."
+  default     = 60
+
+  validation {
+    condition     = contains([0, 1, 5, 10, 15, 30, 60], var.monitoring_interval)
+    error_message = "The monitoring interval must be 0, 1, 5, 10, 15, 30 or 60 seconds."
+  }
+}
+
 variable "iam_database_authentication_enabled" {
   type        = bool
   description = "Allow connecting with an IAM token instead of a stored password."

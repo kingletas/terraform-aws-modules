@@ -1,8 +1,41 @@
 locals {
   create_parameter_group = length(var.cluster_parameters) > 0
   uses_serverless        = anytrue([for instance in var.instances : instance.instance_class == "db.serverless"])
+  monitoring_enabled     = var.monitoring_interval > 0
 
   tags = merge(var.tags, { Name = var.name })
+}
+
+data "aws_partition" "current" {}
+
+data "aws_iam_policy_document" "monitoring_assume_role" {
+  count = local.monitoring_enabled ? 1 : 0
+
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["monitoring.rds.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "monitoring" {
+  count = local.monitoring_enabled ? 1 : 0
+
+  name_prefix        = format("%s-rds-mon-", substr(var.name, 0, 16))
+  assume_role_policy = data.aws_iam_policy_document.monitoring_assume_role[0].json
+
+  tags = local.tags
+}
+
+resource "aws_iam_role_policy_attachment" "monitoring" {
+  count = local.monitoring_enabled ? 1 : 0
+
+  role       = aws_iam_role.monitoring[0].name
+  policy_arn = format("arn:%s:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole", data.aws_partition.current.partition)
 }
 
 resource "aws_db_subnet_group" "this" {
@@ -65,9 +98,10 @@ resource "aws_rds_cluster" "this" {
 
   iam_database_authentication_enabled = var.iam_database_authentication_enabled
 
-  deletion_protection       = var.deletion_protection
-  skip_final_snapshot       = var.skip_final_snapshot
-  final_snapshot_identifier = var.skip_final_snapshot ? null : format("%s-final-%s", var.name, formatdate("YYYYMMDDhhmmss", timestamp()))
+  deletion_protection = var.deletion_protection
+  skip_final_snapshot = var.skip_final_snapshot
+  # Set even when skipped, so turning skip_final_snapshot off later still leaves a name for the destroy to use.
+  final_snapshot_identifier = format("%s-final", var.name)
   apply_immediately         = var.apply_immediately
 
   dynamic "serverlessv2_scaling_configuration" {
@@ -82,8 +116,6 @@ resource "aws_rds_cluster" "this" {
   tags = local.tags
 
   lifecycle {
-    ignore_changes = [final_snapshot_identifier]
-
     precondition {
       condition     = var.manage_master_password || var.password != null
       error_message = "Set manage_master_password, or supply a password."
@@ -113,6 +145,9 @@ resource "aws_rds_cluster_instance" "this" {
 
   performance_insights_enabled    = var.performance_insights_enabled
   performance_insights_kms_key_id = var.performance_insights_enabled ? var.kms_key_arn : null
+
+  monitoring_interval = var.monitoring_interval
+  monitoring_role_arn = local.monitoring_enabled ? aws_iam_role.monitoring[0].arn : null
 
   apply_immediately = var.apply_immediately
 
