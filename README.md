@@ -3,7 +3,7 @@
 [![CI](https://github.com/kingletas/terraform-aws-modules/actions/workflows/ci.yml/badge.svg)](https://github.com/kingletas/terraform-aws-modules/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Fifty-five reusable Terraform modules for AWS, drawn from infrastructure I've actually run: multi-account, networking, compute, data, storage, messaging, edge, identity and operations.
+Fifty-seven reusable Terraform modules for AWS, drawn from infrastructure I've actually run: multi-account, networking, compute, data, storage, messaging, edge, identity and operations.
 
 Each module does one thing, and you compose them. Every input is typed, described and validated where it can be, and every collection is keyed by a name you choose rather than by list position. The `examples/` directory holds working compositions you can apply as they are.
 
@@ -55,12 +55,14 @@ Each module does one thing, and you compose them. Every input is typed, describe
 | [`sns-topic`](modules/sns-topic) | A topic and its subscriptions |
 | [`eventbridge-rule`](modules/eventbridge-rule) | A rule and targets, on a schedule or an event pattern |
 | [`step-function`](modules/step-function) | A state machine, for work one function shouldn't orchestrate |
+| [`amazon-mq`](modules/amazon-mq) | Managed RabbitMQ or ActiveMQ, private to your VPC |
 | **Data movement** | |
 | [`dms-replication`](modules/dms-replication) | Replication instance, endpoints and tasks, with credentials from Secrets Manager |
 | [`mwaa-environment`](modules/mwaa-environment) | Managed Airflow, private web server, per-component log levels |
 | **Edge and API** | |
 | [`cloudfront-distribution`](modules/cloudfront-distribution) | A distribution with origin access control and ordered behaviours |
 | [`api-gateway-rest`](modules/api-gateway-rest) | A REST API with a deployed stage, logging and throttling |
+| [`ses-domain`](modules/ses-domain) | A verified sending domain: DKIM, envelope sender, and the records it needs |
 | [`waf-web-acl`](modules/waf-web-acl) | Managed rule groups, rate limits and IP lists |
 | **Identity and secrets** | |
 | [`iam-role`](modules/iam-role) | Service, cross-account and OIDC trust, in one place |
