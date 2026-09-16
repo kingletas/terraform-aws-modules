@@ -6,7 +6,7 @@ An IPsec tunnel pair to an on-premises device, attached to a transit gateway or 
 
 ```hcl
 module "office" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/site-to-site-vpn?ref=v0.4.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/site-to-site-vpn?ref=v0.5.0"
 
   name                = "head-office"
   customer_gateway_ip = "203.0.113.10"

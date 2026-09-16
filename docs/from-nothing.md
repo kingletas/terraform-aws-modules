@@ -128,7 +128,7 @@ In your own Terraform, point `source` at a module and pin a release with `?ref=`
 
 ```hcl
 module "vpc" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/vpc?ref=v0.4.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/vpc?ref=v0.5.0"
 
   name               = "platform"
   cidr_block         = "10.0.0.0/16"
@@ -136,7 +136,7 @@ module "vpc" {
 }
 
 module "web_sg" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/security-group?ref=v0.4.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/security-group?ref=v0.5.0"
 
   name        = "platform-web"
   description = "Web servers"

@@ -6,6 +6,8 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-16
+
 ### Added
 
 - **`ecs-service`**: per-container `init_process_enabled` and `drop_capabilities`, so a container can run an init process and drop Linux capabilities such as `ALL`, and `health_check_timeout` and `health_check_start_period` for the container health check. Containers that set none of them are unchanged.
@@ -172,7 +174,8 @@ The first release.
 - Encryption is on, public addresses are off and IMDSv2 is required, each with a variable to choose otherwise deliberately.
 - No module carries a provider block.
 
-[Unreleased]: https://github.com/kingletas/terraform-aws-modules/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/kingletas/terraform-aws-modules/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/kingletas/terraform-aws-modules/releases/tag/v0.5.0
 [0.4.0]: https://github.com/kingletas/terraform-aws-modules/releases/tag/v0.4.0
 [0.3.0]: https://github.com/kingletas/terraform-aws-modules/releases/tag/v0.3.0
 [0.2.0]: https://github.com/kingletas/terraform-aws-modules/tree/ea80d9b4a36eb0a0f26c6179be6d22a9918850f5

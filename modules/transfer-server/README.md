@@ -6,7 +6,7 @@ A managed SFTP server over an S3 bucket, with each user confined to its own pref
 
 ```hcl
 module "sftp" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/transfer-server?ref=v0.4.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/transfer-server?ref=v0.5.0"
 
   name        = "platform-sftp"
   bucket_name = module.exchange.id

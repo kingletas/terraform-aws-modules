@@ -6,7 +6,7 @@ A log group with retention, plus the metric and subscription filters that make i
 
 ```hcl
 module "app_logs" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/cloudwatch-log-group?ref=v0.4.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/cloudwatch-log-group?ref=v0.5.0"
 
   name           = "/platform/api"
   retention_days = 90

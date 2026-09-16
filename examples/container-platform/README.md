@@ -61,7 +61,7 @@ To check the example without AWS credentials, run its plan test from the top of 
 make test DIR=examples/container-platform
 ```
 
-The `.tf` files call modules by relative path (`../../modules/<name>`). If you copy this example outside this repository, change each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.4.0`.
+The `.tf` files call modules by relative path (`../../modules/<name>`). If you copy this example outside this repository, change each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.5.0`.
 
 ### Add a service
 

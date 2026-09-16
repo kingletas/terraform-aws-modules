@@ -6,7 +6,7 @@ A single managed relational database, with the master password held by AWS rathe
 
 ```hcl
 module "database" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/rds-instance?ref=v0.4.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/rds-instance?ref=v0.5.0"
 
   name           = "platform-prod"
   engine         = "postgres"

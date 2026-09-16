@@ -6,7 +6,7 @@ A delivery stream that buffers records and writes them somewhere, either an S3 b
 
 ```hcl
 module "metrics_to_vendor" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/kinesis-firehose?ref=v0.4.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/kinesis-firehose?ref=v0.5.0"
 
   name     = "metrics"
   role_arn = module.firehose_role.arn

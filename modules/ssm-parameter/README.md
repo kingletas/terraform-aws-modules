@@ -6,7 +6,7 @@ Parameters written as a set, with the shape and the values kept in separate vari
 
 ```hcl
 module "config" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/ssm-parameter?ref=v0.4.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/ssm-parameter?ref=v0.5.0"
 
   parameters = {
     "/prod/api/log-level"    = { description = "Application log level" }
