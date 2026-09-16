@@ -1,5 +1,6 @@
 # Terraform modules for AWS
 
+[![CI](https://github.com/kingletas/terraform-aws-modules/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kingletas/terraform-aws-modules/actions/workflows/ci.yml?query=branch%3Amain)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Fifty-nine reusable Terraform modules for AWS, covering multi-account setup, networking, compute, data, storage, messaging, edge, identity and operations, and eleven examples that compose them into complete stacks.
