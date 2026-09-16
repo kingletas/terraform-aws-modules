@@ -6,7 +6,7 @@ A managed RabbitMQ or ActiveMQ broker, private to your VPC, encrypted at rest.
 
 ```hcl
 module "broker" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/amazon-mq?ref=v0.2.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/amazon-mq?ref=v0.3.0"
 
   name           = "orders"
   engine_version = "3.13"
@@ -21,7 +21,6 @@ module "broker" {
   }
 
   maintenance_window = { day_of_week = "SUNDAY", time_of_day = "04:00" }
-  kms_key_arn        = module.kms.arn
 }
 ```
 
@@ -37,7 +36,7 @@ What to do about it:
 
 ## What each engine actually supports
 
-The two engines share a resource and very little else. Every rule below is enforced at plan, because AWS enforces it at apply, where half a stack already exists.
+The two engines share a resource and very little else. The module checks the deployment mode, subnet count, user count, storage type, audit log and KMS key against the engine at plan, so a mismatch fails before anything is created rather than part way through an apply.
 
 | | RabbitMQ | ActiveMQ |
 |---|---|---|
@@ -46,6 +45,7 @@ The two engines share a resource and very little else. Every rule below is enfor
 | Further users | the RabbitMQ management interface, not AWS | Terraform |
 | Console access and groups | not applicable | per user |
 | Storage | EBS | EBS or EFS |
+| Customer managed KMS key | no, AWS-owned key only | yes |
 | Audit log | none | optional |
 
 **A RabbitMQ cluster is three nodes and one endpoint.** Going from `SINGLE_INSTANCE` to `CLUSTER_MULTI_AZ` is a replacement, not a resize, so decide before there are queues in it.
@@ -54,16 +54,18 @@ The two engines share a resource and very little else. Every rule below is enfor
 
 **A broker change can restart the broker, and a restart drops every connection.** `apply_immediately` is false so that a change waits for the maintenance window. Set it true only when you know what the change does, and know that clients will reconnect.
 
-**`maintenance_window` defaults to null, which lets AWS choose.** AWS then picks a weekly window you did not, and restarts the broker in it for a minor upgrade. Set one. A Sunday morning in your own timezone is a better answer than whatever AWS picked.
+**`maintenance_window` defaults to null, which lets AWS choose.** AWS then picks a weekly window for you and restarts the broker in it for a minor upgrade. Set one at a time that suits your traffic.
 
-`auto_minor_version_upgrade` is on for the opposite reason: AWS publishes a deprecation schedule for engine minors, and a broker left on a deprecated one is eventually upgraded whether or not you agreed. Better in a window you chose.
+`auto_minor_version_upgrade` is on because AWS publishes a deprecation schedule for engine minor versions, and a broker left on a deprecated one is eventually upgraded anyway. It is better to take that upgrade in a window you chose.
 
 ## Notes
 
 - **`publicly_accessible` is false.** A broker with a public endpoint is one credential away from being someone else's, and the credential is in the state file.
-- `kms_key_arn` null means the AWS-owned key. That is still encryption at rest; it is not a key whose access you can audit or revoke.
+- `kms_key_arn = null` means the AWS-owned key. That is still encryption at rest, but not a key whose access you can audit or revoke.
+- **A customer managed key is ActiveMQ only.** RabbitMQ brokers always use the AWS-owned key, so the module refuses `kms_key_arn` on RabbitMQ at plan.
+- **A broker password is 12 to 250 characters, with at least four different characters, and no comma, colon or equals sign.** The module checks all of these at plan.
 - The `mq.t3.micro` default is for development. RabbitMQ will not form a cluster on it.
-- `endpoints` is flattened across every instance. RabbitMQ publishes one `amqps` endpoint per node; ActiveMQ publishes five per node, one per wire protocol, so read the one your client speaks rather than the first in the list.
+- `endpoints` is flattened across every instance. RabbitMQ publishes one `amqps` endpoint per node. ActiveMQ publishes five per node, one per wire protocol, so read the one your client speaks rather than the first in the list.
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements
@@ -99,7 +101,7 @@ The two engines share a resource and very little else. Every rule below is enfor
 | security\_group\_ids | Security groups controlling who may connect. | `list(string)` | `[]` | no |
 | users | Broker users keyed by username. RabbitMQ takes exactly one, and manages the rest through its own management interface. | <pre>map(object({<br/>    password         = string<br/>    console_access   = optional(bool, false)<br/>    groups           = optional(list(string), [])<br/>    replication_user = optional(bool, false)<br/>  }))</pre> | n/a | yes |
 | publicly\_accessible | Give the broker a public endpoint. Off, because a message broker on the internet is one credential away from being someone else's. | `bool` | `false` | no |
-| kms\_key\_arn | KMS key for encryption at rest. Null uses the AWS-owned key, which is still encryption, just not a key you control. | `string` | `null` | no |
+| kms\_key\_arn | KMS key for encryption at rest. ActiveMQ only; RabbitMQ always uses the AWS-owned key. Null uses the AWS-owned key, which is still encryption, just not a key you control. | `string` | `null` | no |
 | storage\_type | ebs or efs. RabbitMQ is ebs only. ActiveMQ defaults to efs, which is durable across zones and slower. | `string` | `null` | no |
 | general\_log\_enabled | Publish the general broker log to CloudWatch Logs. | `bool` | `true` | no |
 | audit\_log\_enabled | Publish the audit log to CloudWatch Logs. ActiveMQ only; RabbitMQ has no audit log. | `bool` | `false` | no |

@@ -6,7 +6,7 @@ A Managed Workflows for Apache Airflow environment, with a private web server an
 
 ```hcl
 module "airflow" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/mwaa-environment?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/mwaa-environment?ref=v0.3.0"
 
   name              = "warehouse"
   airflow_version   = "2.10.3"
@@ -35,7 +35,7 @@ MWAA takes **20 to 30 minutes** to create, and these fail near the end of it:
 
 ## A changed file at the same key does nothing
 
-MWAA reads `requirements.txt` and `plugins.zip` by **object version**. Overwrite the file at the same key and the environment keeps running the old one — no error, no restart, no sign anything was meant to change.
+MWAA reads `requirements.txt` and `plugins.zip` by **object version**. Overwrite the file at the same key and the environment keeps running the old one, with no error, no restart no sign anything was meant to change.
 
 Pass `requirements_s3_object_version` and `plugins_s3_object_version`, or version the key itself.
 
@@ -43,9 +43,10 @@ Pass `requirements_s3_object_version` and `plugins_s3_object_version`, or versio
 
 - **An Airflow version upgrade replaces the environment.** It is not an in-place change, and it means downtime and a re-created scheduler.
 - `PRIVATE_ONLY` keeps the UI inside the VPC, which needs a VPN or a bastion to reach. `PUBLIC_ONLY` puts it on the internet behind IAM authentication.
-- `min_workers` are billed whether a DAG runs or not. There is no scale to zero — an idle `mw1.small` environment is still several hundred dollars a month.
+- `min_workers` are billed whether a DAG runs or not. There is no scale to zero: an idle `mw1.small` environment is still several hundred dollars a month.
 - **The execution role needs the Celery SQS queue**, which lives in *AWS's* account: `arn:aws:sqs:<region>:*:airflow-celery-*`. The wildcard account is correct and looks wrong in a review.
 - `schedulers = 2` gives scheduler high availability and is what Airflow 2 supports.
+- **`mw1.micro` runs exactly one scheduler and one worker.** Set `min_workers`, `max_workers` and `schedulers` all to 1 with that class, or the plan refuses it.
 - Log levels default to `WARNING` for the noisy components and `INFO` for tasks, because the DAG processor at `INFO` produces a great deal of CloudWatch ingestion for very little.
 
 <!-- BEGIN_TF_DOCS -->
@@ -87,9 +88,9 @@ Pass `requirements_s3_object_version` and `plugins_s3_object_version`, or versio
 | security\_group\_ids | Security groups for the environment. They must allow all traffic from themselves, which is how MWAA's components reach each other. | `list(string)` | n/a | yes |
 | webserver\_access\_mode | PRIVATE\_ONLY keeps the Airflow UI inside the VPC. PUBLIC\_ONLY puts it on the internet behind IAM. | `string` | `"PRIVATE_ONLY"` | no |
 | endpoint\_management | SERVICE lets MWAA create its own VPC endpoints. CUSTOMER means you create them, which is needed in a shared VPC. | `string` | `"SERVICE"` | no |
-| max\_workers | Ceiling for worker autoscaling. | `number` | `10` | no |
-| min\_workers | Workers always running. These are billed whether a DAG is scheduled or not. | `number` | `1` | no |
-| schedulers | Scheduler count. Two or more needs Airflow 2 and gives scheduler high availability. | `number` | `2` | no |
+| max\_workers | Ceiling for worker autoscaling. mw1.micro takes exactly 1. | `number` | `10` | no |
+| min\_workers | Workers always running. These are billed whether a DAG is scheduled or not. mw1.micro takes exactly 1. | `number` | `1` | no |
+| schedulers | Scheduler count. Two or more needs Airflow 2 and gives scheduler high availability. mw1.micro takes exactly 1. | `number` | `2` | no |
 | kms\_key\_arn | KMS key encrypting the environment's data and logs. Null uses the AWS-managed key. | `string` | `null` | no |
 | airflow\_configuration\_options | Airflow configuration overrides, using dotted names such as core.default\_task\_retries. | `map(string)` | `{}` | no |
 | logging | Log configuration keyed by dag\_processing, scheduler, task, webserver or worker. Task logs are the ones you actually read. | <pre>map(object({<br/>    enabled   = optional(bool, true)<br/>    log_level = optional(string, "INFO")<br/>  }))</pre> | <pre>{<br/>  "dag_processing": {<br/>    "log_level": "WARNING"<br/>  },<br/>  "scheduler": {<br/>    "log_level": "WARNING"<br/>  },<br/>  "task": {<br/>    "log_level": "INFO"<br/>  },<br/>  "webserver": {<br/>    "log_level": "WARNING"<br/>  },<br/>  "worker": {<br/>    "log_level": "INFO"<br/>  }<br/>}</pre> | no |

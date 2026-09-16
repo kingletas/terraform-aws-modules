@@ -1,12 +1,15 @@
 data "aws_region" "current" {}
 
+data "aws_partition" "current" {}
+
 locals {
   mail_from_domain = var.mail_from_subdomain == null ? null : format("%s.%s", var.mail_from_subdomain, var.domain)
 
-  # SES publishes three CNAMEs, one per signing token. The keys are the tokens
-  # themselves, which do not exist until the identity is created, so the records
-  # are keyed by position instead and the positions are known at plan.
-  dkim_records = var.create_dns_records ? {
+  # Whether a key was supplied is not secret, and for_each refuses a sensitive value.
+  easy_dkim = nonsensitive(var.byodkim == null)
+
+  # Easy DKIM publishes three CNAMEs, one per signing token, keyed by position because the tokens are unknown at plan.
+  dkim_records = var.create_dns_records && local.easy_dkim ? {
     for index in range(3) :
     format("dkim-%d", index) => {
       name  = format("%s._domainkey.%s", aws_sesv2_email_identity.this.dkim_signing_attributes[0].tokens[index], var.domain)

@@ -27,7 +27,7 @@ data "aws_iam_policy_document" "smtp" {
     resources = ["*"]
 
     condition {
-      test     = "StringEquals"
+      test     = "StringLike"
       variable = "ses:FromAddress"
       values   = [format("*@%s", var.domain)]
     }

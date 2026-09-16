@@ -110,6 +110,11 @@ resource "aws_mq_broker" "this" {
     }
 
     precondition {
+      condition     = !local.is_rabbit || var.kms_key_arn == null
+      error_message = "RabbitMQ brokers are encrypted with the AWS-owned key only. Leave kms_key_arn null, or use ActiveMQ for a customer managed key."
+    }
+
+    precondition {
       condition     = !local.is_rabbit || var.storage_type == null || var.storage_type == "ebs"
       error_message = "RabbitMQ stores on EBS. Only ActiveMQ can use EFS."
     }

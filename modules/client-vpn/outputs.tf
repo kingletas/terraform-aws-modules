@@ -24,7 +24,7 @@ output "server_certificate_arn" {
 }
 
 output "client_root_certificate_chain_arn" {
-  description = "ACM ARN of the client certificate authority, or null for non-certificate authentication."
+  description = "ACM ARN of the certificate whose chain names the client certificate authority, or null for non-certificate authentication."
   value       = local.client_root_certificate_chain_arn
 }
 

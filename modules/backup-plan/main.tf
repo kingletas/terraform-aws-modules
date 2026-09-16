@@ -97,6 +97,21 @@ resource "aws_iam_role_policy_attachment" "restore" {
   policy_arn = format("arn:%s:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForRestores", data.aws_partition.current.partition)
 }
 
+# S3 needs its own managed policies, which also grant the KMS use an SSE-KMS bucket requires through S3.
+resource "aws_iam_role_policy_attachment" "s3_backup" {
+  count = var.s3_backup_enabled ? 1 : 0
+
+  role       = aws_iam_role.this.name
+  policy_arn = format("arn:%s:iam::aws:policy/AWSBackupServiceRolePolicyForS3Backup", data.aws_partition.current.partition)
+}
+
+resource "aws_iam_role_policy_attachment" "s3_restore" {
+  count = var.s3_backup_enabled ? 1 : 0
+
+  role       = aws_iam_role.this.name
+  policy_arn = format("arn:%s:iam::aws:policy/AWSBackupServiceRolePolicyForS3Restore", data.aws_partition.current.partition)
+}
+
 resource "aws_backup_selection" "this" {
   count = local.has_selection ? 1 : 0
 

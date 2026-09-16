@@ -1,15 +1,17 @@
 data "aws_region" "current" {}
 
+data "aws_partition" "current" {}
+
 locals {
   region = coalesce(var.default_region, data.aws_region.current.region)
 
-  # Lay widgets out left to right, wrapping at the 24-column grid, unless the caller placed them.
-  positions = { for index, widget in var.widgets : index => {
-    x = widget.x != null ? widget.x : sum(concat([0], [
-      for earlier_index, earlier in var.widgets :
-      earlier.width if earlier_index < index
-    ])) % 24
-  } }
+  # The console has its own hostname in each partition, and none in a partition not listed here.
+  console_hosts = {
+    aws        = "console.aws.amazon.com"
+    aws-cn     = "console.amazonaws.cn"
+    aws-us-gov = "console.amazonaws-us-gov.com"
+  }
+  console_host = lookup(local.console_hosts, data.aws_partition.current.partition, null)
 
   # Each widget type has a differently shaped properties object, and any step that
   # makes them share a type fails to evaluate or coerces numbers to strings. So the
@@ -45,12 +47,12 @@ locals {
 
   widget_json = [
     for index, widget in var.widgets : format(
-      "{\"type\":%s,\"width\":%d,\"height\":%d,\"x\":%d%s,\"properties\":%s}",
+      "{\"type\":%s,\"width\":%d,\"height\":%d%s,\"properties\":%s}",
       jsonencode(widget.type),
       widget.width,
       widget.height,
-      local.positions[index].x,
-      widget.y == null ? "" : format(",\"y\":%d", widget.y),
+      # An unplaced widget omits both coordinates, and CloudWatch flows it into the next free position, wrapping at 24 columns.
+      widget.x == null ? "" : format(",\"x\":%d,\"y\":%d", widget.x, widget.y),
       local.properties[index],
     )
   ]

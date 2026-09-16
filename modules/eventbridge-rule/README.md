@@ -6,7 +6,7 @@ A rule and its targets, on a schedule or an event pattern.
 
 ```hcl
 module "nightly" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/eventbridge-rule?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/eventbridge-rule?ref=v0.3.0"
 
   name                = "nightly-reconciliation"
   schedule_expression = "cron(0 3 * * ? *)"
@@ -29,8 +29,8 @@ A `dead_letter_arn` turns that into a message sitting in a queue you can inspect
 ## Notes
 
 - **Schedule expressions are always UTC.** A `cron(0 3 * * ? *)` job does not follow daylight saving, so it moves an hour relative to local time twice a year.
-- A Lambda target also needs an invoke permission with this rule's ARN as `source_arn` — the `lambda-function` module's `allowed_invoke_principals` does that side.
-- `input_transformer` reshapes the event before the target sees it, which avoids a Lambda whose only job is reformatting.
+- A Lambda target also needs an invoke permission with this rule's ARN as `source_arn`. The `lambda-function` module's `allowed_invoke_principals` does that side.
+- `input_transformer` reshapes the event before the target sees it, which avoids a Lambda whose only job is reformatting. A target sets at most one of `input`, `input_path` and `input_transformer`, and the plan refuses more.
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements
@@ -63,7 +63,7 @@ A `dead_letter_arn` turns that into a message sitting in a queue you can inspect
 | schedule\_expression | cron or rate expression, in UTC. Set this or event\_pattern, not both. | `string` | `null` | no |
 | event\_pattern\_json | Event pattern as JSON. Set this or schedule\_expression, not both. | `string` | `null` | no |
 | enabled | Whether the rule fires. | `bool` | `true` | no |
-| targets | Targets keyed by a stable name. Always set a dead\_letter\_arn, or a failed delivery is lost silently. | <pre>map(object({<br/>    arn      = string<br/>    role_arn = optional(string)<br/><br/>    input      = optional(string)<br/>    input_path = optional(string)<br/>    input_transformer = optional(object({<br/>      input_paths    = map(string)<br/>      input_template = string<br/>    }))<br/><br/>    dead_letter_arn        = optional(string)<br/>    maximum_retry_attempts = optional(number, 3)<br/>    maximum_event_age      = optional(number, 3600)<br/><br/>    sqs_message_group_id = optional(string)<br/><br/>    ecs_task_definition_arn = optional(string)<br/>    ecs_task_count          = optional(number, 1)<br/>    ecs_launch_type         = optional(string, "FARGATE")<br/>    ecs_subnet_ids          = optional(list(string))<br/>    ecs_security_group_ids  = optional(list(string))<br/>    ecs_assign_public_ip    = optional(bool, false)<br/>  }))</pre> | n/a | yes |
+| targets | Targets keyed by a stable name. Each shapes its payload with at most one of input, input\_path or input\_transformer. Always set a dead\_letter\_arn, or a failed delivery is lost silently. | <pre>map(object({<br/>    arn      = string<br/>    role_arn = optional(string)<br/><br/>    input      = optional(string)<br/>    input_path = optional(string)<br/>    input_transformer = optional(object({<br/>      input_paths    = map(string)<br/>      input_template = string<br/>    }))<br/><br/>    dead_letter_arn        = optional(string)<br/>    maximum_retry_attempts = optional(number, 3)<br/>    maximum_event_age      = optional(number, 3600)<br/><br/>    sqs_message_group_id = optional(string)<br/><br/>    ecs_task_definition_arn = optional(string)<br/>    ecs_task_count          = optional(number, 1)<br/>    ecs_launch_type         = optional(string, "FARGATE")<br/>    ecs_subnet_ids          = optional(list(string))<br/>    ecs_security_group_ids  = optional(list(string))<br/>    ecs_assign_public_ip    = optional(bool, false)<br/>  }))</pre> | n/a | yes |
 | tags | Tags applied to the rule. | `map(string)` | `{}` | no |
 
 ### Outputs

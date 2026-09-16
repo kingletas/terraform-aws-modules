@@ -12,12 +12,16 @@ resource "aws_redshift_subnet_group" "this" {
 }
 
 resource "aws_redshift_parameter_group" "this" {
-  # checkov:skip=CKV_AWS_105: require_ssl is set, in a dynamic block the check cannot walk
-  count = length(var.parameters) > 0 ? 1 : 0
-
+  # checkov:skip=CKV_AWS_105: require_ssl is a static parameter below, from var.require_ssl which defaults to true; the check cannot resolve the variable
   name        = format("%s-params", var.name)
   family      = var.parameter_group_family
   description = format("Parameters for %s", var.name)
+
+  # The group is always created so require_ssl is never left to the default group, where it is off.
+  parameter {
+    name  = "require_ssl"
+    value = tostring(var.require_ssl)
+  }
 
   dynamic "parameter" {
     for_each = var.parameters
@@ -29,6 +33,11 @@ resource "aws_redshift_parameter_group" "this" {
   }
 
   tags = local.tags
+}
+
+moved {
+  from = aws_redshift_parameter_group.this[0]
+  to   = aws_redshift_parameter_group.this
 }
 
 resource "aws_redshift_cluster" "this" {
@@ -50,7 +59,7 @@ resource "aws_redshift_cluster" "this" {
 
   cluster_subnet_group_name    = aws_redshift_subnet_group.this.id
   vpc_security_group_ids       = var.security_group_ids
-  cluster_parameter_group_name = length(var.parameters) > 0 ? aws_redshift_parameter_group.this[0].name : null
+  cluster_parameter_group_name = aws_redshift_parameter_group.this.name
 
   encrypted  = true
   kms_key_id = var.kms_key_arn
@@ -68,14 +77,13 @@ resource "aws_redshift_cluster" "this" {
   preferred_maintenance_window        = var.maintenance_window
   allow_version_upgrade               = var.allow_version_upgrade
 
-  skip_final_snapshot       = var.skip_final_snapshot
-  final_snapshot_identifier = var.skip_final_snapshot ? null : format("%s-final-%s", var.name, formatdate("YYYYMMDDhhmmss", timestamp()))
+  skip_final_snapshot = var.skip_final_snapshot
+  # Set even when skipped, so turning skip_final_snapshot off later still leaves a name for the destroy to use.
+  final_snapshot_identifier = format("%s-final", var.name)
 
   tags = local.tags
 
   lifecycle {
-    ignore_changes = [final_snapshot_identifier]
-
     precondition {
       condition     = var.manage_master_password || var.password != null
       error_message = "Set manage_master_password, or supply a password."
@@ -88,8 +96,8 @@ resource "aws_redshift_cluster" "this" {
   }
 }
 
-# Provider 6 removed the inline logging block from the cluster in favour of this
-# separate resource.
+# Provider 6 configures audit logging with this separate resource rather than an
+# inline block on the cluster.
 resource "aws_redshift_logging" "this" {
   count = var.logging == null ? 0 : 1
 

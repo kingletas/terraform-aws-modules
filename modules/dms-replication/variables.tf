@@ -129,6 +129,18 @@ variable "tasks" {
   }
 }
 
+variable "create_service_roles" {
+  type        = bool
+  description = "Create the account-level dms-vpc-role and dms-cloudwatch-logs-role that DMS needs. Only one configuration per account may create them; leave this off where they already exist."
+  default     = false
+}
+
+variable "create_endpoint_access_role" {
+  type        = bool
+  description = "Create the account-level dms-access-for-endpoint role a Redshift target needs. Only one configuration per account may create it; leave this off where it already exists, such as after a Redshift endpoint was made in the console."
+  default     = false
+}
+
 variable "tags" {
   type        = map(string)
   description = "Tags applied to every resource this module creates."

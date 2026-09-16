@@ -5,11 +5,15 @@ variable "name" {
 
 variable "client_cidr_block" {
   type        = string
-  description = "Address pool handed to connecting clients. Must be at least a /22 and must not overlap the VPC."
+  description = "Address pool handed to connecting clients. Between a /12 and a /22, and must not overlap the VPC."
 
   validation {
-    condition     = can(cidrhost(var.client_cidr_block, 0)) && tonumber(split("/", var.client_cidr_block)[1]) <= 22
-    error_message = "The client_cidr_block must be a valid IPv4 CIDR of /22 or larger."
+    condition = (
+      can(regex("^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+$", var.client_cidr_block))
+      && can(cidrhost(var.client_cidr_block, 0))
+      && try(tonumber(split("/", var.client_cidr_block)[1]) >= 12 && tonumber(split("/", var.client_cidr_block)[1]) <= 22, false)
+    )
+    error_message = "The client_cidr_block must be an IPv4 CIDR between /12 and /22."
   }
 }
 
@@ -30,7 +34,7 @@ variable "subnet_ids" {
 
 variable "security_group_ids" {
   type        = list(string)
-  description = "Security groups applied to the endpoint's network interfaces."
+  description = "Security groups applied to the endpoint's network interfaces. Empty uses the VPC default security group."
   default     = []
 }
 
@@ -68,7 +72,7 @@ variable "server_certificate" {
 
 variable "client_root_certificate_chain_arn" {
   type        = string
-  description = "ACM ARN of the client certificate authority. Required for certificate authentication unless client_root_certificate is set."
+  description = "ACM ARN of a certificate issued by the client certificate authority and imported with that authority as its chain. The endpoint accepts every client certificate the authority signed. When the server certificate was issued by the same authority, its ARN works here. Required for certificate authentication unless client_root_certificate is set."
   default     = null
 }
 
@@ -78,7 +82,7 @@ variable "client_root_certificate" {
     private_key       = string
     certificate_chain = optional(string)
   })
-  description = "PEM material for the client certificate authority, imported into ACM. Ignored when client_root_certificate_chain_arn is set."
+  description = "PEM material imported into ACM for certificate authentication: a certificate issued by the client certificate authority, such as a client certificate, its private key, and the authority's certificate as certificate_chain. Ignored when client_root_certificate_chain_arn is set."
   default     = null
   sensitive   = true
 }

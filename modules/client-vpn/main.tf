@@ -102,8 +102,9 @@ resource "aws_cloudwatch_log_stream" "this" {
 resource "aws_ec2_client_vpn_endpoint" "this" {
   description = format("%s client VPN", var.name)
 
-  vpc_id                 = var.vpc_id
-  security_group_ids     = var.security_group_ids
+  vpc_id = var.vpc_id
+  # An empty list is refused by the API, so none given means the VPC default security group.
+  security_group_ids     = length(var.security_group_ids) > 0 ? var.security_group_ids : null
   server_certificate_arn = local.server_certificate_arn
   client_cidr_block      = var.client_cidr_block
   dns_servers            = var.dns_servers

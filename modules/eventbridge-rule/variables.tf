@@ -58,11 +58,19 @@ variable "targets" {
     ecs_security_group_ids  = optional(list(string))
     ecs_assign_public_ip    = optional(bool, false)
   }))
-  description = "Targets keyed by a stable name. Always set a dead_letter_arn, or a failed delivery is lost silently."
+  description = "Targets keyed by a stable name. Each shapes its payload with at most one of input, input_path or input_transformer. Always set a dead_letter_arn, or a failed delivery is lost silently."
 
   validation {
     condition     = length(var.targets) > 0
     error_message = "A rule with no target does nothing."
+  }
+
+  validation {
+    condition = alltrue([
+      for _, target in var.targets :
+      length([for input in [target.input, target.input_path, target.input_transformer] : input if input != null]) <= 1
+    ])
+    error_message = "Each target sets at most one of input, input_path or input_transformer."
   }
 }
 

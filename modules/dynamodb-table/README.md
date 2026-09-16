@@ -6,7 +6,7 @@ A table with point-in-time recovery and deletion protection on, and indexes decl
 
 ```hcl
 module "sessions" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/dynamodb-table?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/dynamodb-table?ref=v0.3.0"
 
   name      = "sessions"
   hash_key  = "session_id"
@@ -30,10 +30,11 @@ module "sessions" {
 
 ## What `attributes` is for
 
-Only attributes used as a key somewhere — the table's keys, or any index's keys — are declared. DynamoDB has no schema for anything else, so listing a non-key attribute is an error rather than documentation.
+Only attributes used as a key somewhere (the table's keys, or any index's keys) are declared. DynamoDB has no schema for anything else, so listing a non-key attribute is an error rather than documentation.
 
 ## Notes
 
+- **The module needs AWS provider 6.37.0 or later**, because it declares global secondary index keys with the `key_schema` block.
 - **Changing `hash_key` or `range_key` replaces the table**, which destroys the data. Decide the key design before the first apply.
 - A local secondary index can only be created with the table. A global one can be added later.
 - `ttl_attribute` names an attribute holding an expiry as epoch seconds. Deletion happens within a couple of days of that time, not at it.
@@ -45,13 +46,13 @@ Only attributes used as a key somewhere — the table's keys, or any index's key
 | Name | Version |
 | ---- | ------- |
 | terraform | >= 1.9 |
-| aws | >= 6.0, < 7.0 |
+| aws | >= 6.37.0, < 7.0 |
 
 ### Providers
 
 | Name | Version |
 | ---- | ------- |
-| aws | >= 6.0, < 7.0 |
+| aws | >= 6.37.0, < 7.0 |
 
 ### Resources
 

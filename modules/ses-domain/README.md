@@ -6,7 +6,7 @@ A verified sending domain: DKIM, a custom envelope sender, a configuration set, 
 
 ```hcl
 module "mail" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/ses-domain?ref=v0.2.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/ses-domain?ref=v0.3.0"
 
   domain              = "example.com"
   mail_from_subdomain = "mail"
@@ -48,7 +48,7 @@ Set `OPTIONAL` if you send to an audience you do not control and would rather de
 
 ## SMTP needs an IAM user, and most applications should not use SMTP
 
-`create_smtp_user` is off. When it is on, the module creates an IAM user, an access key, and a policy that permits sending only from an address on this domain.
+`create_smtp_user` is off. When it is on, the module creates an IAM user, an access key, and a policy that permits sending only from addresses on this domain (`*@<domain>`).
 
 That is a long-lived credential, which is what this library otherwise works hard to avoid. There is no way around it: **SMTP authenticates with a username and password and has nowhere to put a session token**, so a role cannot be used. The SES SMTP password is an IAM secret access key put through a derivation, which the AWS provider computes as `ses_smtp_password_v4`.
 
@@ -65,6 +65,7 @@ So the order of preference is:
 - **The configuration set is attached to the identity**, so every send through this domain is attributed to it whether or not the caller names it. That is what makes the event destinations reliable.
 - `suppressed_reasons` defaults to bounces and complaints, so a repeat send to a known-bad address never leaves the account. That protects reputation more than any single message is worth.
 - **Easy DKIM is the default and AWS rotates the key.** `byodkim` takes that over, along with the rotation, which then belongs to whoever set it.
+- **With `byodkim` set, the module publishes no DKIM record and `dns_records` lists none.** Easy DKIM's three CNAMEs do not apply. Publish one `TXT` record yourself at `<selector>._domainkey.<domain>`, with the value `p=` followed by the base64 public key matching `byodkim.private_key`. The module holds only the private key, so it cannot write that record for you. The MAIL FROM and DMARC records are still published as usual.
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements
@@ -124,7 +125,7 @@ So the order of preference is:
 | verified | Whether SES has seen the DNS records and verified the identity. False until they resolve. |
 | configuration\_set\_name | Configuration set every send through this identity is attributed to. |
 | mail\_from\_domain | Envelope sender domain, or null when the AWS default is in use. |
-| dns\_records | Every record the domain needs, whether or not this module published them. Give these to whoever runs the zone when it is not in Route 53. |
+| dns\_records | Every record the domain needs, whether or not this module published them. With byodkim set, the DKIM TXT record is not listed and is yours to publish. Give these to whoever runs the zone when it is not in Route 53. |
 | smtp\_endpoint | SMTP host for this region. Port 587 with STARTTLS, or 465 with implicit TLS. |
 | smtp\_username | SMTP username, which is the access key ID. Null when create\_smtp\_user is false. |
 | smtp\_password | SMTP password, derived from the secret access key. Null when create\_smtp\_user is false. |

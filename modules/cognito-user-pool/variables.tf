@@ -63,10 +63,21 @@ variable "software_token_mfa" {
   default     = true
 }
 
+variable "user_pool_tier" {
+  type        = string
+  description = "Feature plan: LITE, ESSENTIALS or PLUS. Threat protection needs PLUS, which is billed per monthly active user."
+  default     = "ESSENTIALS"
+
+  validation {
+    condition     = contains(["LITE", "ESSENTIALS", "PLUS"], var.user_pool_tier)
+    error_message = "The user_pool_tier must be LITE, ESSENTIALS or PLUS."
+  }
+}
+
 variable "advanced_security_mode" {
   type        = string
-  description = "Threat protection: OFF, AUDIT to record risk, or ENFORCED to act on it. Billed per active user."
-  default     = "AUDIT"
+  description = "Threat protection: OFF, AUDIT to record risk, or ENFORCED to act on it. AUDIT and ENFORCED need user_pool_tier PLUS."
+  default     = "OFF"
 
   validation {
     condition     = contains(["OFF", "AUDIT", "ENFORCED"], var.advanced_security_mode)

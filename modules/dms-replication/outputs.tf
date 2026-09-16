@@ -32,3 +32,16 @@ output "subnet_group_id" {
   description = "ID of the replication subnet group."
   value       = aws_dms_replication_subnet_group.this.id
 }
+
+output "service_role_arns" {
+  description = "ARNs of the account-level roles this module created, keyed dms_vpc and dms_cloudwatch_logs when create_service_roles is on, and dms_access_for_endpoint when create_endpoint_access_role is on."
+  value = merge(
+    var.create_service_roles ? {
+      dms_vpc             = aws_iam_role.dms_vpc[0].arn
+      dms_cloudwatch_logs = aws_iam_role.dms_cloudwatch_logs[0].arn
+    } : {},
+    var.create_endpoint_access_role ? {
+      dms_access_for_endpoint = aws_iam_role.dms_access_for_endpoint[0].arn
+    } : {},
+  )
+}

@@ -75,8 +75,13 @@ variable "users" {
   }
 
   validation {
-    condition     = alltrue([for _, user in var.users : !strcontains(user.password, ",")])
-    error_message = "A broker password may not contain a comma."
+    condition     = alltrue([for _, user in var.users : length(distinct(split("", user.password))) >= 4])
+    error_message = "A broker password needs at least four different characters."
+  }
+
+  validation {
+    condition     = alltrue([for _, user in var.users : !can(regex("[,:=]", user.password))])
+    error_message = "A broker password may not contain a comma, a colon or an equals sign."
   }
 }
 
@@ -88,7 +93,7 @@ variable "publicly_accessible" {
 
 variable "kms_key_arn" {
   type        = string
-  description = "KMS key for encryption at rest. Null uses the AWS-owned key, which is still encryption, just not a key you control."
+  description = "KMS key for encryption at rest. ActiveMQ only; RabbitMQ always uses the AWS-owned key. Null uses the AWS-owned key, which is still encryption, just not a key you control."
   default     = null
 }
 

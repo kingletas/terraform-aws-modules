@@ -55,7 +55,7 @@ run "plans_with_an_smtp_user_and_published_records" {
   }
 }
 
-# The quiet direction above proves nothing about the loud one.
+# Refusal tests: each run below must fail the plan.
 run "refuses_publishing_records_with_no_zone" {
   command = plan
 
@@ -111,4 +111,103 @@ run "refuses_an_event_type_ses_does_not_publish" {
   }
 
   expect_failures = [var.event_destinations]
+}
+
+run "limits_the_smtp_user_to_addresses_on_the_domain" {
+  command = plan
+
+  variables {
+    domain           = "example.com"
+    create_smtp_user = true
+  }
+
+  assert {
+    condition     = one(one(data.aws_iam_policy_document.smtp[0].statement).condition).test == "StringLike"
+    error_message = "A wildcard sender address only matches under StringLike."
+  }
+
+  assert {
+    condition     = contains(one(one(data.aws_iam_policy_document.smtp[0].statement).condition).values, "*@example.com")
+    error_message = "The SMTP user must be limited to addresses on the identity domain."
+  }
+}
+
+run "publishes_easy_dkim_records" {
+  command = plan
+
+  variables {
+    domain             = "example.com"
+    create_dns_records = true
+    zone_id            = "Z0123456789ABCDEFGHIJ"
+  }
+
+  assert {
+    condition     = keys(aws_route53_record.dkim) == ["dkim-0", "dkim-1", "dkim-2"]
+    error_message = "Easy DKIM needs its three CNAME records."
+  }
+}
+
+run "publishes_no_easy_dkim_records_with_byodkim" {
+  command = plan
+
+  variables {
+    domain             = "example.com"
+    create_dns_records = true
+    zone_id            = "Z0123456789ABCDEFGHIJ"
+    byodkim            = { private_key = "cGxhbi10ZXN0LXBsYWNlaG9sZGVy", selector = "plan" }
+  }
+
+  assert {
+    condition     = length(aws_route53_record.dkim) == 0
+    error_message = "With byodkim there are no Easy DKIM tokens to publish."
+  }
+}
+
+run "builds_the_smtp_endpoint_from_the_partition" {
+  command = plan
+
+  variables {
+    domain = "example.com"
+  }
+
+  override_data {
+    target = data.aws_region.current
+    values = {
+      region = "us-gov-west-1"
+    }
+  }
+
+  override_data {
+    target = data.aws_partition.current
+    values = {
+      partition  = "aws-us-gov"
+      dns_suffix = "amazonaws.com"
+    }
+  }
+
+  assert {
+    condition     = output.smtp_endpoint == "email-smtp.us-gov-west-1.amazonaws.com"
+    error_message = "The SMTP endpoint must take its DNS suffix from the partition."
+  }
+}
+
+run "builds_the_smtp_endpoint_from_another_dns_suffix" {
+  command = plan
+
+  variables {
+    domain = "example.com"
+  }
+
+  override_data {
+    target = data.aws_partition.current
+    values = {
+      partition  = "aws-plan-test"
+      dns_suffix = "example.internal"
+    }
+  }
+
+  assert {
+    condition     = output.smtp_endpoint == "email-smtp.us-east-1.example.internal"
+    error_message = "The SMTP endpoint must not have a DNS suffix written in."
+  }
 }

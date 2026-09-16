@@ -64,13 +64,34 @@ variable "sns_topic_name" {
 
 variable "data_events" {
   type = map(object({
-    resource_type             = string
-    resource_values           = list(string)
-    read_write_type           = optional(string, "All")
-    include_management_events = optional(bool, true)
+    resource_type   = string
+    resource_values = list(string)
+    read_write_type = optional(string, "All")
   }))
-  description = "Data event selectors keyed by a stable name, for object-level S3 or Lambda invocation logging. These are billed per event and a busy bucket generates a great many."
+  description = "Data event selectors keyed by a stable name, for object-level S3 or Lambda invocation logging. read_write_type is All, ReadOnly or WriteOnly. These are billed per event and a busy bucket generates a great many."
   default     = {}
+
+  validation {
+    condition     = alltrue([for _, selector in var.data_events : contains(["All", "ReadOnly", "WriteOnly"], selector.read_write_type)])
+    error_message = "Each data event read_write_type must be All, ReadOnly or WriteOnly."
+  }
+}
+
+variable "include_management_events" {
+  type        = bool
+  description = "Record management events, the control-plane calls that change the account. Turning this off leaves only the data events."
+  default     = true
+}
+
+variable "management_events_read_write_type" {
+  type        = string
+  description = "Which management events to record: All, ReadOnly or WriteOnly."
+  default     = "All"
+
+  validation {
+    condition     = contains(["All", "ReadOnly", "WriteOnly"], var.management_events_read_write_type)
+    error_message = "The management_events_read_write_type must be All, ReadOnly or WriteOnly."
+  }
 }
 
 variable "insight_types" {

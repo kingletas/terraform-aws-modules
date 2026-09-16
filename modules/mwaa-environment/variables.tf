@@ -105,20 +105,35 @@ variable "endpoint_management" {
 
 variable "max_workers" {
   type        = number
-  description = "Ceiling for worker autoscaling."
+  description = "Ceiling for worker autoscaling. mw1.micro takes exactly 1."
   default     = 10
+
+  validation {
+    condition     = var.environment_class != "mw1.micro" || var.max_workers == 1
+    error_message = "An mw1.micro environment runs exactly one scheduler and one worker, so max_workers must be 1."
+  }
 }
 
 variable "min_workers" {
   type        = number
-  description = "Workers always running. These are billed whether a DAG is scheduled or not."
+  description = "Workers always running. These are billed whether a DAG is scheduled or not. mw1.micro takes exactly 1."
   default     = 1
+
+  validation {
+    condition     = var.environment_class != "mw1.micro" || var.min_workers == 1
+    error_message = "An mw1.micro environment runs exactly one scheduler and one worker, so min_workers must be 1."
+  }
 }
 
 variable "schedulers" {
   type        = number
-  description = "Scheduler count. Two or more needs Airflow 2 and gives scheduler high availability."
+  description = "Scheduler count. Two or more needs Airflow 2 and gives scheduler high availability. mw1.micro takes exactly 1."
   default     = 2
+
+  validation {
+    condition     = var.environment_class != "mw1.micro" || var.schedulers == 1
+    error_message = "An mw1.micro environment runs exactly one scheduler and one worker, so schedulers must be 1."
+  }
 }
 
 variable "kms_key_arn" {

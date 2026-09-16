@@ -46,6 +46,14 @@ variable "alarms" {
   validation {
     condition = alltrue([
       for name, alarm in var.alarms :
+      alarm.metric_query == null || length([for query in coalesce(alarm.metric_query, []) : query.id if query.return_data]) == 1
+    ])
+    error_message = "Each metric_query alarm needs exactly one query with return_data = true, which is the series the alarm evaluates."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, alarm in var.alarms :
       contains(["missing", "notBreaching", "breaching", "ignore"], alarm.treat_missing_data)
     ])
     error_message = "The treat_missing_data must be missing, notBreaching, breaching or ignore."

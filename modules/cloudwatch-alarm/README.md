@@ -6,7 +6,7 @@ Alarms declared as a set, including metric maths, with a shared default action.
 
 ```hcl
 module "alarms" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/cloudwatch-alarm?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/cloudwatch-alarm?ref=v0.3.0"
 
   default_alarm_actions = [module.alerts.arn]
   default_ok_actions    = [module.alerts.arn]
@@ -34,14 +34,14 @@ module "alarms" {
 
 An alarm on "more than 50 errors" fires during a traffic spike where the error *rate* never moved, and stays quiet at 3am when 40 of your 45 requests fail. Neither is the thing you wanted to know.
 
-`metric_query` is what lets you divide one metric by another and alarm on the result. It is more setup, and it is the difference between an alarm that means something and one people learn to ignore.
+`metric_query` is what lets you divide one metric by another and alarm on the result. Exactly one query in the list must set `return_data = true`: that is the series the alarm evaluates. The module checks this at plan.
 
 ## Notes
 
-- **`treat_missing_data` decides what silence means.** A queue that stops receiving produces no datapoints; `missing` leaves the alarm in its previous state forever. Pick deliberately — `notBreaching` for a metric that legitimately goes quiet, `breaching` for a heartbeat.
+- **`treat_missing_data` decides what silence means.** A queue that stops receiving produces no datapoints, and with the default `missing` the alarm moves to `INSUFFICIENT_DATA` rather than alarming. Choose deliberately: `notBreaching` for a metric that legitimately goes quiet, `breaching` for a heartbeat.
 - `datapoints_to_alarm` below `evaluation_periods` gives an M-of-N alarm, which rides out a single bad interval without ignoring a real trend.
-- **Set `ok_actions`.** An alarm that never says it recovered leaves someone checking by hand.
-- `actions_enabled = false` silences an alarm while you tune it, which is better than deleting and forgetting to recreate it.
+- An alarm with no `alarm_actions` or `ok_actions` of its own uses `default_alarm_actions` and `default_ok_actions`. **Set the OK actions.** An alarm that never says it recovered leaves someone checking by hand.
+- `actions_enabled = false` silences every alarm in the module while you tune thresholds, without deleting them.
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements

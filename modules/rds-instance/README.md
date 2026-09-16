@@ -6,7 +6,7 @@ A single managed relational database, with the master password held by AWS rathe
 
 ```hcl
 module "database" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/rds-instance?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/rds-instance?ref=v0.3.0"
 
   name           = "platform-prod"
   engine         = "postgres"
@@ -29,8 +29,9 @@ Setting `manage_master_password = false` and supplying `password` puts a credent
 
 ## Notes
 
-- `multi_az` doubles the instance cost and is what makes a zone failure survivable. It does not give you a read replica — the standby serves nothing.
-- `skip_final_snapshot` is off, so a destroy leaves something to restore from. The snapshot name carries a timestamp and is ignored on subsequent plans.
+- `multi_az` doubles the instance cost and is what makes a zone failure survivable. It does not give you a read replica: the standby serves nothing.
+- `skip_final_snapshot` is off, so a destroy leaves a snapshot to restore from. It is named `<name>-final`, with no timestamp, and the name is set even while the skip is on, so turning the skip off later needs no other change. A second destroy under the same name fails while that snapshot exists: delete or rename it first.
+- ARNs are built for the current partition, so the module works in GovCloud and China regions as well as the commercial one.
 - Supplying `parameters` needs `parameter_group_family` as well, such as `postgres16`.
 - Storage autoscaling raises `allocated_storage` up to `max_allocated_storage`. It never lowers it, and storage cannot be reduced without a rebuild.
 

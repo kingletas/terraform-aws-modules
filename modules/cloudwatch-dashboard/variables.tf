@@ -13,8 +13,8 @@ variable "widgets" {
     y      = optional(number)
 
     # A JSON-encoded CloudWatch metric array, from jsonencode in the caller.
-    # The array is heterogeneous by design — dimension pairs as strings, then an
-    # optional options object overriding stat or colour for that one line — and
+    # The array is heterogeneous by design (dimension pairs as strings, then an
+    # optional options object overriding stat or colour for that one line), and
     # no Terraform object type can hold that alongside the rest of a widget.
     metrics_json = optional(string)
     view         = optional(string, "timeSeries")
@@ -36,11 +36,21 @@ variable "widgets" {
 
     log_query = optional(string)
   }))
-  description = "Widgets in reading order. Leave x and y unset and the module lays them out left to right, wrapping at 24 columns."
+  description = "Widgets in reading order. Leave x and y unset and CloudWatch places them left to right, wrapping at 24 columns. Set both to place a widget yourself."
 
   validation {
     condition     = alltrue([for widget in var.widgets : widget.width >= 1 && widget.width <= 24])
     error_message = "A widget width must be between 1 and 24, which is the grid width."
+  }
+
+  validation {
+    condition     = alltrue([for widget in var.widgets : (widget.x == null) == (widget.y == null)])
+    error_message = "Set both x and y on a widget, or neither."
+  }
+
+  validation {
+    condition     = alltrue([for widget in var.widgets : widget.x == null || (coalesce(widget.x, 0) >= 0 && coalesce(widget.x, 0) + widget.width <= 24)])
+    error_message = "A placed widget must fit the grid: x is at least 0 and x plus width is at most 24."
   }
 }
 

@@ -8,7 +8,7 @@ Certificate, Active Directory and SAML authentication are all supported. Connect
 
 ```hcl
 module "vpn" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/client-vpn?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/client-vpn?ref=v0.3.0"
 
   name              = "platform"
   vpc_id            = module.vpc.vpc_id
@@ -53,23 +53,25 @@ Generate the certificates with [easy-rsa](https://github.com/OpenVPN/easy-rsa):
 ./easyrsa build-server-full server nopass && ./easyrsa build-client-full client nopass
 ```
 
-The private keys are secrets. Keep them out of `.tfvars` files and out of git — pass them on the command line from disk, as `examples/client-vpn-cert-auth` shows.
+For certificate authentication, `client_root_certificate` is a certificate issued by the client certificate authority, usually a client certificate and its key, with the authority's certificate as `certificate_chain`. AWS trusts the authority in that chain, so the endpoint accepts every client certificate the authority signs. When one authority issues both the server and client certificates, you can pass the server certificate's ARN as `client_root_certificate_chain_arn` instead of importing a second certificate.
+
+The private keys are secrets. Keep them out of `.tfvars` files and out of git: read them from disk on the command line, as `examples/client-vpn-cert-auth` shows. An imported private key is stored in Terraform state, so protect the state accordingly.
 
 ## Authorization and routing
 
-A client that connects can reach nothing until an authorization rule says otherwise. Each rule names a destination CIDR and either one Active Directory or SAML group, or every group:
+A client that connects can reach nothing until an authorization rule says otherwise. Each rule names a destination CIDR and exactly one of `access_group_id` (an Active Directory group SID or a SAML group name) or `authorize_all_groups = true`:
 
 ```hcl
 authorization_rules = {
   database_tier = {
     target_network_cidr = "10.0.16.0/20"
     description         = "Database subnets, platform engineers only"
-    access_group_id     = "arn:aws:iam::…:role/PlatformEngineer"
+    access_group_id     = "platform-engineers"
   }
 }
 ```
 
-The CIDRs of associated subnets are routed for you. `routes` is for anything beyond them — a peered VPC, an on-premises range over a transit gateway, or `0.0.0.0/0` to send client internet traffic out through the VPC.
+The CIDRs of associated subnets are routed for you. `routes` is for anything beyond them: a peered VPC, an on-premises range over a transit gateway, or `0.0.0.0/0` to send client internet traffic out through the VPC.
 
 ## What this costs
 
@@ -81,10 +83,11 @@ Two meters run, and the first one surprises people:
 ## Notes
 
 - `split_tunnel` is on, so only VPC-bound traffic enters the tunnel. Turning it off routes all of a client's internet traffic through AWS and is billed accordingly.
-- `client_cidr_block` must be a `/22` or larger and must not overlap the VPC. It cannot be changed after the endpoint exists.
+- `client_cidr_block` must be an IPv4 CIDR between a `/12` and a `/22`, and must not overlap the VPC. The module refuses a size outside that range at plan. It cannot be changed after the endpoint exists.
+- `subnet_ids` is a map keyed by availability zone, the shape of the vpc module's `private_subnet_ids` output.
+- With `security_group_ids` empty, the endpoint uses the VPC's default security group.
 - Port 443 with UDP is the default. TCP gets through restrictive networks that block UDP, at some cost in throughput.
-- The self-service portal requires federated authentication; the module rejects the combination at plan time rather than at apply.
-- Older versions of the AWS provider mangled network associations on update, which was worked around with `ignore_changes`. That workaround is not carried here. If you see associations churn on an unrelated change, check the provider changelog before adding it back — the cost of `ignore_changes` is that the resource can no longer be updated at all.
+- The self-service portal requires federated authentication. The module rejects any other combination at plan.
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements
@@ -120,15 +123,15 @@ Two meters run, and the first one surprises people:
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | name | Name prefix for the endpoint and everything attached to it. | `string` | n/a | yes |
-| client\_cidr\_block | Address pool handed to connecting clients. Must be at least a /22 and must not overlap the VPC. | `string` | n/a | yes |
+| client\_cidr\_block | Address pool handed to connecting clients. Between a /12 and a /22, and must not overlap the VPC. | `string` | n/a | yes |
 | vpc\_id | VPC the endpoint is associated with. | `string` | n/a | yes |
 | subnet\_ids | Subnets to associate the endpoint with, keyed by availability zone. Each association is billed hourly. The vpc module's private\_subnet\_ids output has this shape. | `map(string)` | n/a | yes |
-| security\_group\_ids | Security groups applied to the endpoint's network interfaces. | `list(string)` | `[]` | no |
+| security\_group\_ids | Security groups applied to the endpoint's network interfaces. Empty uses the VPC default security group. | `list(string)` | `[]` | no |
 | authentication\_type | How clients authenticate: certificate-authentication, directory-service-authentication or federated-authentication. | `string` | `"certificate-authentication"` | no |
 | server\_certificate\_arn | ACM ARN of the server certificate. Leave null to import server\_certificate instead. | `string` | `null` | no |
 | server\_certificate | PEM material for the server certificate, imported into ACM. Ignored when server\_certificate\_arn is set. | <pre>object({<br/>    certificate_body  = string<br/>    private_key       = string<br/>    certificate_chain = optional(string)<br/>  })</pre> | `null` | no |
-| client\_root\_certificate\_chain\_arn | ACM ARN of the client certificate authority. Required for certificate authentication unless client\_root\_certificate is set. | `string` | `null` | no |
-| client\_root\_certificate | PEM material for the client certificate authority, imported into ACM. Ignored when client\_root\_certificate\_chain\_arn is set. | <pre>object({<br/>    certificate_body  = string<br/>    private_key       = string<br/>    certificate_chain = optional(string)<br/>  })</pre> | `null` | no |
+| client\_root\_certificate\_chain\_arn | ACM ARN of a certificate issued by the client certificate authority and imported with that authority as its chain. The endpoint accepts every client certificate the authority signed. When the server certificate was issued by the same authority, its ARN works here. Required for certificate authentication unless client\_root\_certificate is set. | `string` | `null` | no |
+| client\_root\_certificate | PEM material imported into ACM for certificate authentication: a certificate issued by the client certificate authority, such as a client certificate, its private key, and the authority's certificate as certificate\_chain. Ignored when client\_root\_certificate\_chain\_arn is set. | <pre>object({<br/>    certificate_body  = string<br/>    private_key       = string<br/>    certificate_chain = optional(string)<br/>  })</pre> | `null` | no |
 | directory\_id | Directory Service directory ID. Required for directory-service-authentication. | `string` | `null` | no |
 | saml\_provider\_arn | IAM SAML provider ARN. Required for federated-authentication. | `string` | `null` | no |
 | self\_service\_saml\_provider\_arn | IAM SAML provider ARN backing the self-service portal. | `string` | `null` | no |
@@ -153,7 +156,7 @@ Two meters run, and the first one surprises people:
 | dns\_name | DNS name clients connect to. Prefix it with a random string when the endpoint has multiple associations. |
 | self\_service\_portal\_url | Self-service portal URL, or null when the portal is disabled. |
 | server\_certificate\_arn | ACM ARN of the server certificate in use. |
-| client\_root\_certificate\_chain\_arn | ACM ARN of the client certificate authority, or null for non-certificate authentication. |
+| client\_root\_certificate\_chain\_arn | ACM ARN of the certificate whose chain names the client certificate authority, or null for non-certificate authentication. |
 | network\_association\_ids | Network association IDs, keyed by availability zone. |
 | connection\_log\_group\_name | CloudWatch log group holding connection logs, or null when logging is disabled. |
 <!-- END_TF_DOCS -->

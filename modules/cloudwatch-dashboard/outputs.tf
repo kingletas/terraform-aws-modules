@@ -9,6 +9,6 @@ output "arn" {
 }
 
 output "url" {
-  description = "Console URL for the dashboard."
-  value       = format("https://%s.console.aws.amazon.com/cloudwatch/home?region=%s#dashboards:name=%s", local.region, local.region, var.name)
+  description = "Console URL for the dashboard, or null in a partition with no known console hostname."
+  value       = local.console_host == null ? null : format("https://%s/cloudwatch/home?region=%s#dashboards:name=%s", local.console_host, local.region, var.name)
 }

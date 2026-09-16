@@ -10,6 +10,7 @@ resource "aws_cognito_user_pool" "this" {
   username_attributes      = var.username_attributes
   auto_verified_attributes = var.auto_verified_attributes
   mfa_configuration        = var.mfa_configuration
+  user_pool_tier           = var.user_pool_tier
   deletion_protection      = var.deletion_protection ? "ACTIVE" : "INACTIVE"
 
   password_policy {
@@ -67,6 +68,11 @@ resource "aws_cognito_user_pool" "this" {
   tags = merge(var.tags, { Name = var.name })
 
   lifecycle {
+    precondition {
+      condition     = var.advanced_security_mode == "OFF" || var.user_pool_tier == "PLUS"
+      error_message = "Threat protection, advanced_security_mode AUDIT or ENFORCED, is only available on the PLUS feature plan. Set user_pool_tier to PLUS or advanced_security_mode to OFF."
+    }
+
     precondition {
       condition     = !local.use_custom_domain || var.custom_domain_certificate_arn != null
       error_message = "A custom domain needs custom_domain_certificate_arn, and the certificate must be in us-east-1."

@@ -85,10 +85,21 @@ variable "default_iam_role_arn" {
   default     = null
 }
 
+variable "require_ssl" {
+  type        = bool
+  description = "Refuse client connections that do not use TLS. On, and set in the cluster's own parameter group whatever else parameters holds."
+  default     = true
+}
+
 variable "parameters" {
   type        = map(string)
-  description = "Cluster parameters. A parameter group is created only when this is non-empty."
-  default     = { require_ssl = "true", enable_user_activity_logging = "true" }
+  description = "Cluster parameters, added to the parameter group this module always creates. Set require_ssl through its own variable, not here."
+  default     = { enable_user_activity_logging = "true" }
+
+  validation {
+    condition     = !contains(keys(var.parameters), "require_ssl")
+    error_message = "Set require_ssl with the require_ssl variable, not in parameters."
+  }
 }
 
 variable "parameter_group_family" {

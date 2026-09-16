@@ -24,10 +24,10 @@ output "mail_from_domain" {
 }
 
 output "dns_records" {
-  description = "Every record the domain needs, whether or not this module published them. Give these to whoever runs the zone when it is not in Route 53."
+  description = "Every record the domain needs, whether or not this module published them. With byodkim set, the DKIM TXT record is not listed and is yours to publish. Give these to whoever runs the zone when it is not in Route 53."
   value = concat(
     [
-      for token in aws_sesv2_email_identity.this.dkim_signing_attributes[0].tokens : {
+      for token in(local.easy_dkim ? aws_sesv2_email_identity.this.dkim_signing_attributes[0].tokens : []) : {
         name  = format("%s._domainkey.%s", token, var.domain)
         type  = "CNAME"
         value = format("%s.dkim.amazonses.com", token)
@@ -57,7 +57,7 @@ output "dns_records" {
 
 output "smtp_endpoint" {
   description = "SMTP host for this region. Port 587 with STARTTLS, or 465 with implicit TLS."
-  value       = format("email-smtp.%s.amazonaws.com", data.aws_region.current.region)
+  value       = format("email-smtp.%s.%s", data.aws_region.current.region, data.aws_partition.current.dns_suffix)
 }
 
 output "smtp_username" {

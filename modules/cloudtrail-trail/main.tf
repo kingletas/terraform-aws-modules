@@ -1,3 +1,17 @@
+locals {
+  # All selects both, so it adds no readOnly field selector.
+  read_only_values = {
+    All       = []
+    ReadOnly  = ["true"]
+    WriteOnly = ["false"]
+  }
+
+  # With no data events and management events at All, the trail keeps AWS's default selector.
+  select_management_events = var.include_management_events && (
+    length(var.data_events) > 0 || var.management_events_read_write_type != "All"
+  )
+}
+
 resource "aws_cloudtrail" "this" {
   name           = var.name
   s3_bucket_name = var.s3_bucket_name
@@ -13,6 +27,29 @@ resource "aws_cloudtrail" "this" {
   cloud_watch_logs_group_arn = var.cloudwatch_log_group_arn == null ? null : format("%s:*", var.cloudwatch_log_group_arn)
   cloud_watch_logs_role_arn  = var.cloudwatch_role_arn
   sns_topic_name             = var.sns_topic_name
+
+  # Advanced selectors replace the basic management selector, so management events are selected here explicitly.
+  dynamic "advanced_event_selector" {
+    for_each = local.select_management_events ? [var.management_events_read_write_type] : []
+
+    content {
+      name = "management-events"
+
+      field_selector {
+        field  = "eventCategory"
+        equals = ["Management"]
+      }
+
+      dynamic "field_selector" {
+        for_each = local.read_only_values[advanced_event_selector.value]
+
+        content {
+          field  = "readOnly"
+          equals = [field_selector.value]
+        }
+      }
+    }
+  }
 
   dynamic "advanced_event_selector" {
     for_each = var.data_events
@@ -34,6 +71,15 @@ resource "aws_cloudtrail" "this" {
         field       = "resources.ARN"
         starts_with = advanced_event_selector.value.resource_values
       }
+
+      dynamic "field_selector" {
+        for_each = local.read_only_values[advanced_event_selector.value.read_write_type]
+
+        content {
+          field  = "readOnly"
+          equals = [field_selector.value]
+        }
+      }
     }
   }
 
@@ -48,6 +94,11 @@ resource "aws_cloudtrail" "this" {
   tags = merge(var.tags, { Name = var.name })
 
   lifecycle {
+    precondition {
+      condition     = var.include_management_events || length(var.data_events) > 0
+      error_message = "A trail with include_management_events false needs at least one data event, or it records nothing."
+    }
+
     precondition {
       condition     = var.cloudwatch_log_group_arn == null || var.cloudwatch_role_arn != null
       error_message = "Delivering to CloudWatch Logs needs cloudwatch_role_arn."

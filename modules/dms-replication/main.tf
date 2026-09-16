@@ -1,3 +1,5 @@
+data "aws_partition" "current" {}
+
 locals {
   tags = merge(var.tags, { Name = var.name })
 
@@ -33,6 +35,9 @@ resource "aws_dms_replication_instance" "this" {
   kms_key_arn                 = var.kms_key_arn
 
   tags = local.tags
+
+  # DMS looks for dms-vpc-role when it places the instance in a VPC.
+  depends_on = [aws_iam_role_policy_attachment.dms_vpc]
 
   lifecycle {
     precondition {
@@ -75,8 +80,9 @@ resource "aws_dms_replication_task" "this" {
   replication_task_id      = format("%s-%s", var.name, each.key)
   replication_instance_arn = aws_dms_replication_instance.this.replication_instance_arn
 
-  source_endpoint_arn = aws_dms_endpoint.this[each.value.source_endpoint].endpoint_arn
-  target_endpoint_arn = aws_dms_endpoint.this[each.value.target_endpoint].endpoint_arn
+  # A missing name falls back to a placeholder so the preconditions below report it instead of an index error.
+  source_endpoint_arn = try(aws_dms_endpoint.this[each.value.source_endpoint].endpoint_arn, "missing-endpoint")
+  target_endpoint_arn = try(aws_dms_endpoint.this[each.value.target_endpoint].endpoint_arn, "missing-endpoint")
 
   migration_type            = each.value.migration_type
   table_mappings            = each.value.table_mappings_json
@@ -100,4 +106,84 @@ resource "aws_dms_replication_task" "this" {
       error_message = format("Task %s names a target_endpoint that is not in endpoints.", each.key)
     }
   }
+}
+
+# --- account-level service roles ---
+
+data "aws_iam_policy_document" "dms_assume_role" {
+  count = var.create_service_roles ? 1 : 0
+
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["dms.amazonaws.com"]
+    }
+  }
+}
+
+# DMS finds these roles by their exact names, so there is one of each per account.
+resource "aws_iam_role" "dms_vpc" {
+  count = var.create_service_roles ? 1 : 0
+
+  name               = "dms-vpc-role"
+  assume_role_policy = data.aws_iam_policy_document.dms_assume_role[0].json
+
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "dms_vpc" {
+  count = var.create_service_roles ? 1 : 0
+
+  role       = aws_iam_role.dms_vpc[0].name
+  policy_arn = format("arn:%s:iam::aws:policy/service-role/AmazonDMSVPCManagementRole", data.aws_partition.current.partition)
+}
+
+resource "aws_iam_role" "dms_cloudwatch_logs" {
+  count = var.create_service_roles ? 1 : 0
+
+  name               = "dms-cloudwatch-logs-role"
+  assume_role_policy = data.aws_iam_policy_document.dms_assume_role[0].json
+
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "dms_cloudwatch_logs" {
+  count = var.create_service_roles ? 1 : 0
+
+  role       = aws_iam_role.dms_cloudwatch_logs[0].name
+  policy_arn = format("arn:%s:iam::aws:policy/service-role/AmazonDMSCloudWatchLogsRole", data.aws_partition.current.partition)
+}
+
+# A Redshift target reaches the cluster through this role, and Redshift assumes it as well as DMS.
+data "aws_iam_policy_document" "dms_access_for_endpoint_assume_role" {
+  count = var.create_endpoint_access_role ? 1 : 0
+
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["dms.amazonaws.com", "redshift.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "dms_access_for_endpoint" {
+  count = var.create_endpoint_access_role ? 1 : 0
+
+  name               = "dms-access-for-endpoint"
+  assume_role_policy = data.aws_iam_policy_document.dms_access_for_endpoint_assume_role[0].json
+
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "dms_access_for_endpoint" {
+  count = var.create_endpoint_access_role ? 1 : 0
+
+  role       = aws_iam_role.dms_access_for_endpoint[0].name
+  policy_arn = format("arn:%s:iam::aws:policy/service-role/AmazonDMSRedshiftS3Role", data.aws_partition.current.partition)
 }
