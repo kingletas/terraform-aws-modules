@@ -1,0 +1,4 @@
+output "id" {
+  description = "Identifier of the bucket."
+  value       = aws_s3_bucket.this.id
+}

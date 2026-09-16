@@ -2,3 +2,4 @@ terraform 1.16.2
 tflint 0.64.0
 terraform-docs 0.24.0
 checkov 3.3.15
+conftest 0.62.0

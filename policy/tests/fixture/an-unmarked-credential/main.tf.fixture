@@ -1,0 +1,7 @@
+resource "aws_db_instance" "this" {
+  identifier      = "fixture"
+  instance_class  = "db.t4g.micro"
+  engine          = "postgres"
+  password        = var.database_password
+  master_username = "fixture"
+}

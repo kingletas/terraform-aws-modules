@@ -6,6 +6,7 @@ TERRAFORM="${TERRAFORM:-terraform}"
 CHECKOV="${CHECKOV:-checkov}"
 TFLINT="${TFLINT:-tflint}"
 TERRAFORM_DOCS="${TERRAFORM_DOCS:-terraform-docs}"
+CONFTEST="${CONFTEST:-conftest}"
 
 # One provider download shared by every directory, in a cache of this checkout's
 # own so no other project can corrupt it. Terraform ignores a cache where there

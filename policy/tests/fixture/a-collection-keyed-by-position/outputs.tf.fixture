@@ -1,0 +1,4 @@
+output "ids" {
+  description = "Subnet identifiers."
+  value       = aws_subnet.this[*].id
+}

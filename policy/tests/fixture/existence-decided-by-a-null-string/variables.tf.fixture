@@ -1,0 +1,5 @@
+variable "policy_json" {
+  type        = string
+  description = "Policy to attach, or null for none."
+  default     = null
+}

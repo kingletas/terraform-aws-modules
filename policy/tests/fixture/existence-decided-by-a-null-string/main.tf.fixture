@@ -1,0 +1,6 @@
+resource "aws_iam_policy" "this" {
+  count = var.policy_json == null ? 0 : 1
+
+  name   = "fixture"
+  policy = var.policy_json
+}

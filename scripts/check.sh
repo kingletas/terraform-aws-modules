@@ -27,6 +27,7 @@ run_lane "validate" "$ROOT_DIR/scripts/validate.sh"
 run_lane "plan" "$ROOT_DIR/scripts/plan.sh"
 run_lane "lint" "$ROOT_DIR/scripts/lint.sh"
 run_lane "security" "$ROOT_DIR/scripts/security.sh"
+run_lane "policy" "$ROOT_DIR/scripts/policy.sh"
 run_lane "docs" env CHECK_ONLY=1 "$ROOT_DIR/scripts/docs.sh"
 
 echo

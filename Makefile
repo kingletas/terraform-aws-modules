@@ -9,8 +9,9 @@ TERRAFORM ?= terraform
 CHECKOV ?= checkov
 TFLINT ?= tflint
 TERRAFORM_DOCS ?= terraform-docs
+CONFTEST ?= conftest
 
-export ROOT_DIR TERRAFORM CHECKOV TFLINT TERRAFORM_DOCS
+export ROOT_DIR TERRAFORM CHECKOV TFLINT TERRAFORM_DOCS CONFTEST
 
 # --- help ---
 
@@ -49,6 +50,10 @@ lint: ## Run tflint over every module and example
 .PHONY: security
 security: ## Run checkov over the repository
 	@$(ROOT_DIR)/scripts/security.sh
+
+.PHONY: policy
+policy: ## Check the repository's own conventions, and that each rule still refuses
+	@$(ROOT_DIR)/scripts/policy.sh
 
 .PHONY: docs
 docs: ## Regenerate the input and output tables in every module README

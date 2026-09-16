@@ -1,0 +1,6 @@
+resource "aws_subnet" "this" {
+  count = length(var.subnet_cidrs)
+
+  vpc_id     = "vpc-fixture"
+  cidr_block = var.subnet_cidrs[count.index]
+}

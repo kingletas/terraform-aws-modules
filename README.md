@@ -3,7 +3,7 @@
 [![CI](https://github.com/kingletas/terraform-aws-modules/actions/workflows/ci.yml/badge.svg)](https://github.com/kingletas/terraform-aws-modules/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Fifty-seven reusable Terraform modules for AWS, drawn from infrastructure I've actually run: multi-account, networking, compute, data, storage, messaging, edge, identity and operations.
+Fifty-nine reusable Terraform modules for AWS, drawn from infrastructure I've actually run: multi-account, networking, compute, data, storage, messaging, edge, identity and operations.
 
 Each module does one thing, and you compose them. Every input is typed, described and validated where it can be, and every collection is keyed by a name you choose rather than by list position. The `examples/` directory holds working compositions you can apply as they are.
 
@@ -56,6 +56,7 @@ Each module does one thing, and you compose them. Every input is typed, describe
 | [`eventbridge-rule`](modules/eventbridge-rule) | A rule and targets, on a schedule or an event pattern |
 | [`step-function`](modules/step-function) | A state machine, for work one function shouldn't orchestrate |
 | [`amazon-mq`](modules/amazon-mq) | Managed RabbitMQ or ActiveMQ, private to your VPC |
+| [`kinesis-firehose`](modules/kinesis-firehose) | Buffered delivery to S3 or an HTTP endpoint, with a bucket behind it |
 | **Data movement** | |
 | [`dms-replication`](modules/dms-replication) | Replication instance, endpoints and tasks, with credentials from Secrets Manager |
 | [`mwaa-environment`](modules/mwaa-environment) | Managed Airflow, private web server, per-component log levels |
@@ -77,6 +78,7 @@ Each module does one thing, and you compose them. Every input is typed, describe
 | [`cloudwatch-alarm`](modules/cloudwatch-alarm) | Alarms as a set, including metric maths |
 | [`cloudwatch-dashboard`](modules/cloudwatch-dashboard) | A dashboard that lays its own widgets out |
 | [`cloudwatch-log-group`](modules/cloudwatch-log-group) | Retention, metric filters and subscriptions |
+| [`cloudwatch-metric-stream`](modules/cloudwatch-metric-stream) | Metrics pushed to a delivery stream instead of polled for |
 | [`backup-plan`](modules/backup-plan) | A vault and plan, selecting resources by tag |
 | [`cloudtrail-trail`](modules/cloudtrail-trail) | A multi-region trail with log file validation |
 | [`transfer-server`](modules/transfer-server) | Managed SFTP over S3, each user confined to its prefix |
@@ -149,7 +151,7 @@ make help
 make check
 ```
 
-`make check` runs six lanes: formatting, validation, the plan tests, tflint, checkov and a check that every module README matches its code. Each tool's version is pinned in `.tool-versions`. **If a tool is missing or the wrong version, the lane says so and fails.** It never counts as a pass, because a green run that quietly skipped half its checks is worse than a red one.
+`make check` runs seven lanes: formatting, validation, the plan tests, tflint, checkov, the policy rules in [`policy/`](policy), and a check that every module README matches its code. Each tool's version is pinned in `.tool-versions`. **If a tool is missing or the wrong version, the lane says so and fails.** It never counts as a pass, because a green run that quietly skipped half its checks is worse than a red one.
 
 | Target | What it does |
 |---|---|
@@ -158,6 +160,7 @@ make check
 | `make plan-test` | Plan every example, and every module no example uses, against mock providers |
 | `make lint` | Run tflint |
 | `make security` | Run checkov |
+| `make policy` | Check this repository's own conventions, and that each rule still refuses |
 | `make docs` | Regenerate the input and output tables in each module README |
 | `make clean` | Remove `.terraform` directories and the modules' lock files |
 
@@ -171,6 +174,7 @@ The input and output tables in each module README are generated between the `BEG
 | [checkov](https://www.checkov.io/) | `make security` |
 | [tflint](https://github.com/terraform-linters/tflint) | `make lint` |
 | [terraform-docs](https://terraform-docs.io/) | `make docs` |
+| [conftest](https://www.conftest.dev/) | `make policy` |
 
 ## A note on checkov
 
@@ -196,6 +200,7 @@ Every module and example is checked statically, and every module is planned agai
 | **`terraform test` with mock providers** | **every module plans with real values**, including IDs that don't exist until apply — see below |
 | `tflint` with the AWS ruleset | clean |
 | `checkov` | clean, with each skip explained in `.checkov.yml` or on the resource |
+| **`conftest`** | **the conventions in `CONTRIBUTING.md` hold**, and every rule is watched refusing a fixture built to break it. See [`policy/`](policy) |
 | `terraform-docs --output-check` | every module README current |
 | Applied against AWS or an emulator | **no** |
 

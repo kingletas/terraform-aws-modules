@@ -65,6 +65,12 @@ jobs:
       - name: Install checkov
         run: pip install --disable-pip-version-check "checkov==${CHECKOV_VERSION}"
 
+      - name: Install conftest
+        run: |
+          curl -fsSL -o /tmp/conftest.tar.gz \
+            "https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz"
+          tar -xzf /tmp/conftest.tar.gz -C /usr/local/bin conftest
+
       # The same entry point a developer runs, so CI and a laptop cannot disagree.
       - name: make check
         env:

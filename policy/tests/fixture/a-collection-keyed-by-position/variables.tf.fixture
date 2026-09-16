@@ -1,0 +1,4 @@
+variable "subnet_cidrs" {
+  type        = list(string)
+  description = "One subnet per entry."
+}
