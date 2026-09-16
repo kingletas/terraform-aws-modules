@@ -36,6 +36,11 @@ run "plans_threat_protection_on_plus" {
     user_pool_tier         = "PLUS"
     advanced_security_mode = "ENFORCED"
   }
+
+  assert {
+    condition     = aws_cognito_user_pool.this.user_pool_tier == "PLUS" && aws_cognito_user_pool.this.user_pool_add_ons[0].advanced_security_mode == "ENFORCED"
+    error_message = "A PLUS pool should enforce threat protection when asked."
+  }
 }
 
 run "refuses_threat_protection_without_plus" {

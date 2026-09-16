@@ -30,6 +30,26 @@ run "plans_an_include_list" {
 
     tags = { ManagedBy = "terraform" }
   }
+
+  assert {
+    condition     = toset([for filter in aws_cloudwatch_metric_stream.this.include_filter : filter.namespace]) == toset(["AWS/EC2", "AWS/ApplicationELB"]) && length(aws_cloudwatch_metric_stream.this.exclude_filter) == 0
+    error_message = "Each included namespace should become an include filter, with no exclude filters."
+  }
+
+  assert {
+    condition     = one([for filter in aws_cloudwatch_metric_stream.this.include_filter : filter.metric_names if filter.namespace == "AWS/ApplicationELB"]) == toset(["RequestCount", "TargetResponseTime", "HTTPCode_Target_5XX_Count"])
+    error_message = "An include filter should carry the metric names given for its namespace."
+  }
+
+  assert {
+    condition     = one(aws_cloudwatch_metric_stream.this.statistics_configuration).additional_statistics == toset(["p95", "p99"])
+    error_message = "The statistics configuration should carry its additional statistics."
+  }
+
+  assert {
+    condition     = aws_cloudwatch_metric_stream.this.tags["Name"] == "plan-test" && aws_cloudwatch_metric_stream.this.tags["ManagedBy"] == "terraform"
+    error_message = "The stream should carry the caller's tags and its name."
+  }
 }
 
 run "plans_an_exclude_list" {
@@ -38,6 +58,11 @@ run "plans_an_exclude_list" {
   variables {
     name               = "plan-test-exclude"
     exclude_namespaces = { "AWS/Usage" = [] }
+  }
+
+  assert {
+    condition     = [for filter in aws_cloudwatch_metric_stream.this.exclude_filter : filter.namespace] == ["AWS/Usage"] && length(aws_cloudwatch_metric_stream.this.include_filter) == 0
+    error_message = "An excluded namespace should become an exclude filter, with no include filters."
   }
 }
 

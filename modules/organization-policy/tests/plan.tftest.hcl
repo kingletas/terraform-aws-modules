@@ -30,6 +30,16 @@ run "plans_with_real_values" {
 
     tags = { ManagedBy = "terraform" }
   }
+
+  assert {
+    condition     = aws_organizations_policy.this.type == "SERVICE_CONTROL_POLICY" && jsondecode(aws_organizations_policy.this.content).Statement[0].Action == ["organizations:LeaveOrganization"]
+    error_message = "The policy should be a service control policy carrying the given content."
+  }
+
+  assert {
+    condition     = { for name, attachment in aws_organizations_policy_attachment.this : name => attachment.target_id } == { root = "r-a1b2", workload = "ou-a1b2-abcd1234", sandbox = "123456789012" }
+    error_message = "The policy should be attached once to each target, keyed by the target's name."
+  }
 }
 
 # Refusal tests: each run below must fail the plan.

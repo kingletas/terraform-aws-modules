@@ -30,14 +30,7 @@ variable "password_policy" {
     reuse_prevention      = optional(number, 24)
     hard_expiry           = optional(bool, false)
   })
-  description = <<-EOT
-    IAM password policy for console users. Null leaves the account default,
-    which is weaker than anything here.
-
-    max_age_days defaults to 0, meaning no expiry. Forced rotation makes people
-    pick worse passwords and is no longer recommended by NIST; length and a
-    second factor do the work instead.
-  EOT
+  description = "IAM password policy for console users, with no expiry by default, or null to leave the account's own policy untouched."
   default     = {}
 }
 

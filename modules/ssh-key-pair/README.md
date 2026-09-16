@@ -28,7 +28,9 @@ module "ssh_key" {
 }
 ```
 
-> [!warning] A generated private key is in Terraform state, in clear text
+> [!WARNING]
+> **A generated private key is in Terraform state, in clear text**
+>
 > That is unavoidable, because Terraform records what it created, and it is why supplying a public key is preferred for anything long-lived. Whoever can read the state file can read the key.
 >
 > `write_private_key_to` additionally puts it on the disk of whoever ran the apply, at mode 0600. It is off by default. `store_in_secrets_manager` is on instead, so a CI job or a second operator can fetch it without it being emailed around.
