@@ -48,8 +48,13 @@ variable "on_premises" {
     static_routes_only = optional(bool, false)
     routes             = optional(list(string), [])
   })
-  description = "Site-to-site VPN to an on-premises network. Null skips it entirely."
+  description = "Site-to-site VPN to an on-premises network. Null skips it entirely. The routes list the on-premises CIDRs and are required with BGP too, because the VPC route tables need them and routes learned by BGP are not known at plan."
   default     = null
+
+  validation {
+    condition     = var.on_premises == null ? true : length(var.on_premises.routes) > 0
+    error_message = "on_premises.routes needs at least one on-premises CIDR, even with BGP, or traffic to on-premises leaves through the NAT gateways."
+  }
 }
 
 variable "interface_endpoint_services" {

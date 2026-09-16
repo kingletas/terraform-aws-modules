@@ -20,6 +20,26 @@ module "origin_certificate" {
   tags = local.tags
 }
 
+# Only a request carrying this distribution's origin header is forwarded; the
+# rest, including other CloudFront distributions, get a 403.
+locals {
+  origin_verify_header = "X-Origin-Verify"
+
+  origin_default_response = {
+    status_code = 403
+  }
+
+  origin_listener_rules = {
+    from_cloudfront = {
+      priority     = 10
+      target_group = "web"
+      http_headers = {
+        (local.origin_verify_header) = [random_password.origin_verify.result]
+      }
+    }
+  }
+}
+
 module "alb" {
   source = "../../modules/alb"
 
@@ -29,6 +49,9 @@ module "alb" {
 
   security_group_ids = [module.alb_sg.id]
   certificate_arn    = module.origin_certificate.validated_arn
+
+  # Only CloudFront reaches the load balancer, and only on 443.
+  create_http_listener = false
 
   target_groups = {
     web = {
@@ -45,8 +68,10 @@ module "alb" {
     }
   }
 
-  default_target_group = "web"
-  idle_timeout         = 120
+  default_fixed_response = local.origin_default_response
+  listener_rules         = local.origin_listener_rules
+
+  idle_timeout = 120
 
   enable_deletion_protection = local.defaults.deletion_protection
 
@@ -108,7 +133,7 @@ module "waf" {
 
 # CloudFront rather than a Varnish tier. It caches at the edge instead of in one
 # region, needs no instances to patch, and Magento's own full page cache in
-# Redis already covers what Varnish was doing behind the load balancer.
+# Redis covers what a Varnish tier would do behind the load balancer.
 module "cdn" {
   source = "../../modules/cloudfront-distribution"
 
@@ -123,10 +148,9 @@ module "cdn" {
       domain_name     = aws_route53_record.origin.fqdn
       custom_protocol = "https-only"
 
-      # A shared secret the load balancer can require, so nobody reaches the
-      # origin directly and bypasses the WAF.
+      # The load balancer forwards only requests carrying this header.
       custom_headers = {
-        "X-Origin-Verify" = random_password.origin_verify.result
+        (local.origin_verify_header) = random_password.origin_verify.result
       }
     }
 
@@ -171,6 +195,27 @@ module "cdn" {
   tags = local.tags
 }
 
+# Only this distribution may read the static bucket.
+data "aws_iam_policy_document" "static" {
+  statement {
+    sid       = "AllowCloudFrontRead"
+    effect    = "Allow"
+    actions   = ["s3:GetObject"]
+    resources = [format("arn:%s:s3:::%s/*", data.aws_partition.current.partition, local.static_assets_bucket)]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceArn"
+      values   = [module.cdn.arn]
+    }
+  }
+}
+
 resource "random_password" "origin_verify" {
   length  = 48
   special = false
@@ -186,30 +231,4 @@ resource "aws_route53_record" "storefront" {
     zone_id                = module.cdn.hosted_zone_id
     evaluate_target_health = false
   }
-}
-
-# Only this distribution may read the static bucket.
-data "aws_iam_policy_document" "static" {
-  statement {
-    sid       = "AllowCloudFrontRead"
-    effect    = "Allow"
-    actions   = ["s3:GetObject"]
-    resources = [format("%s/*", module.static_assets.arn)]
-
-    principals {
-      type        = "Service"
-      identifiers = ["cloudfront.amazonaws.com"]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "AWS:SourceArn"
-      values   = [module.cdn.arn]
-    }
-  }
-}
-
-resource "aws_s3_bucket_policy" "static" {
-  bucket = module.static_assets.id
-  policy = data.aws_iam_policy_document.static.json
 }

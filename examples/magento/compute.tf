@@ -35,11 +35,26 @@ data "aws_iam_policy_document" "node" {
     resources = [module.ansible.facts_parameter_arn]
   }
 
+  # The Valkey auth token and the OpenSearch password, and no other parameter.
+  statement {
+    sid       = "ReadServiceCredentials"
+    effect    = "Allow"
+    actions   = ["ssm:GetParameter", "ssm:GetParameters"]
+    resources = values(module.service_credentials.arns)
+  }
+
   statement {
     sid       = "UseTheKey"
     effect    = "Allow"
     actions   = ["kms:Decrypt", "kms:DescribeKey", "kms:GenerateDataKey"]
     resources = [module.kms.arn]
+  }
+
+  statement {
+    sid       = "AnsibleTransfer"
+    effect    = "Allow"
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+    resources = [format("%s/*", module.ansible_transfer.arn)]
   }
 
   statement {
@@ -51,26 +66,32 @@ data "aws_iam_policy_document" "node" {
 }
 
 locals {
-  # Where to find everything, and the ARNs to fetch secrets from at runtime.
-  # Nothing secret is in here; it is written to a file the AMI reads at boot.
+  # Where to find everything, and where to fetch each secret from. No secret value is in here.
+  node_environment = {
+    MAGENTO_ENVIRONMENT               = var.environment
+    MAGENTO_DB_HOST                   = module.database.endpoint
+    MAGENTO_DB_READER_HOST            = module.database.reader_endpoint
+    MAGENTO_DB_NAME                   = module.database.database_name
+    MAGENTO_DB_SECRET_ARN             = module.database.master_user_secret_arn
+    MAGENTO_REDIS_HOST                = module.cache.primary_endpoint_address
+    MAGENTO_REDIS_PORT                = tostring(module.cache.port)
+    MAGENTO_REDIS_AUTH_PARAMETER      = module.service_credentials.names[local.service_credential_paths.cache_auth_token]
+    MAGENTO_SEARCH_HOST               = module.search.endpoint
+    MAGENTO_SEARCH_USER               = local.search_master_user
+    MAGENTO_SEARCH_PASSWORD_PARAMETER = module.service_credentials.names[local.service_credential_paths.search_password]
+    MAGENTO_MEDIA_FS                  = module.media.id
+    MAGENTO_STATIC_BUCKET             = module.static_assets.id
+    MAGENTO_FACTS_PARAMETER           = module.ansible.facts_parameter_name
+    AWS_REGION                        = var.region
+  }
+
   node_cloud_init = <<-EOT
     #cloud-config
     write_files:
       - path: /etc/magento/environment
         permissions: "0644"
         content: |
-          MAGENTO_ENVIRONMENT=${var.environment}
-          MAGENTO_DB_HOST=${module.database.endpoint}
-          MAGENTO_DB_READER_HOST=${module.database.reader_endpoint}
-          MAGENTO_DB_NAME=${module.database.database_name}
-          MAGENTO_DB_SECRET_ARN=${module.database.master_user_secret_arn}
-          MAGENTO_REDIS_HOST=${module.cache.primary_endpoint_address}
-          MAGENTO_REDIS_PORT=${module.cache.port}
-          MAGENTO_SEARCH_HOST=${module.search.endpoint}
-          MAGENTO_MEDIA_FS=${module.media.id}
-          MAGENTO_STATIC_BUCKET=${module.static_assets.id}
-          MAGENTO_FACTS_PARAMETER=${module.ansible.facts_parameter_name}
-          AWS_REGION=${var.region}
+          ${indent(6, join("\n", [for key, value in local.node_environment : format("%s=%s", key, value)]))}
     runcmd:
       - mkdir -p /var/www/html/pub/media
       - >-
@@ -108,9 +129,10 @@ module "web_template" {
 module "web" {
   source = "../../modules/autoscaling-group"
 
-  name               = module.context.name["web"]
-  launch_template_id = module.web_template.id
-  subnet_ids         = values(module.vpc.private_subnet_ids)
+  name                    = module.context.name["web"]
+  launch_template_id      = module.web_template.id
+  launch_template_version = module.web_template.latest_version
+  subnet_ids              = values(module.vpc.private_subnet_ids)
 
   min_size         = local.capacity.min
   max_size         = local.capacity.max
@@ -140,6 +162,16 @@ module "web" {
 
 # --- the jobs exactly one machine may do: pets ---
 
+# The AMI the singletons were built from. A new ami_id rolls only the web tier;
+# replacing this resource rolls the singletons onto the current ami_id.
+resource "terraform_data" "singleton_ami" {
+  input = var.ami_id
+
+  lifecycle {
+    ignore_changes = [input]
+  }
+}
+
 # Magento has work that cannot be replicated. Two nodes running
 # bin/magento cron:run claim the same cron_schedule rows, and the result is
 # duplicate order emails and indexers stuck in "working" forever.
@@ -149,7 +181,7 @@ module "singletons" {
   name = local.prefix
 
   defaults = {
-    ami_id        = var.ami_id
+    ami_id        = terraform_data.singleton_ami.output
     instance_type = var.instance_types[var.environment]
 
     subnet_ids           = values(module.vpc.private_subnet_ids)

@@ -4,6 +4,8 @@ data "aws_availability_zones" "available" {
 
 data "aws_caller_identity" "current" {}
 
+data "aws_partition" "current" {}
+
 data "aws_route53_zone" "this" {
   name         = var.hosted_zone_name
   private_zone = false
@@ -43,6 +45,9 @@ module "kms" {
   description = "Storefront data at rest"
 
   service_principals = [format("logs.%s.amazonaws.com", var.region)]
+
+  # The alerts topic is encrypted with this key, so its publishers need it too.
+  delivery_service_principals = ["cloudwatch.amazonaws.com", "backup.amazonaws.com"]
 
   deletion_window_in_days = module.context.is_production ? 30 : 7
 
@@ -105,6 +110,23 @@ module "endpoints" {
 
 # --- security groups ---
 
+# CloudFront's origin-facing addresses, the only source the load balancer accepts.
+data "aws_ec2_managed_prefix_list" "cloudfront_origin" {
+  name = "com.amazonaws.global.cloudfront.origin-facing"
+}
+
+locals {
+  alb_ingress_rules = {
+    https = {
+      description    = "HTTPS from CloudFront origin-facing servers"
+      ip_protocol    = "tcp"
+      from_port      = 443
+      to_port        = 443
+      prefix_list_id = data.aws_ec2_managed_prefix_list.cloudfront_origin.id
+    }
+  }
+}
+
 module "alb_sg" {
   source = "../../modules/security-group"
 
@@ -112,22 +134,7 @@ module "alb_sg" {
   description = "Storefront load balancer"
   vpc_id      = module.vpc.vpc_id
 
-  ingress_rules = {
-    https = {
-      description = "HTTPS from CloudFront and from health checks"
-      ip_protocol = "tcp"
-      from_port   = 443
-      to_port     = 443
-      cidr_ipv4   = "0.0.0.0/0"
-    }
-    http = {
-      description = "HTTP, answered with a redirect"
-      ip_protocol = "tcp"
-      from_port   = 80
-      to_port     = 80
-      cidr_ipv4   = "0.0.0.0/0"
-    }
-  }
+  ingress_rules = local.alb_ingress_rules
 
   egress_rules = {
     vpc = {

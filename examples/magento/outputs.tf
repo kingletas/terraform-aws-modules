@@ -19,7 +19,7 @@ output "cdn_distribution_id" {
 }
 
 output "origin_dns_name" {
-  description = "The load balancer behind CloudFront. Requests here bypass the WAF, which is what the origin verify header exists to stop."
+  description = "The load balancer behind CloudFront. It accepts only CloudFront origin-facing addresses and answers 403 without the origin verify header."
   value       = aws_route53_record.origin.fqdn
 }
 
@@ -41,6 +41,11 @@ output "database_endpoint" {
 output "database_secret_arn" {
   description = "Secrets Manager secret holding the database password. Nothing readable is in Terraform state."
   value       = module.database.master_user_secret_arn
+}
+
+output "service_credential_parameters" {
+  description = "SSM SecureString parameters holding the Valkey auth token and the OpenSearch master password, by name. The values are not in any output."
+  value       = local.service_credential_paths
 }
 
 output "ansible_inventory" {

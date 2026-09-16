@@ -60,9 +60,59 @@ data "aws_iam_policy_document" "pipeline" {
     actions   = ["kms:Decrypt", "kms:GenerateDataKey"]
     resources = [module.kms.arn]
   }
+
+  # Step Functions sets up log delivery through vended-log APIs that take no resource ARN.
+  statement {
+    sid    = "DeliverExecutionLogs"
+    effect = "Allow"
+
+    actions = [
+      "logs:CreateLogDelivery",
+      "logs:GetLogDelivery",
+      "logs:UpdateLogDelivery",
+      "logs:DeleteLogDelivery",
+      "logs:ListLogDeliveries",
+      "logs:PutResourcePolicy",
+      "logs:DescribeResourcePolicies",
+      "logs:DescribeLogGroups",
+    ]
+
+    resources = ["*"]
+  }
+
+  # The step-function module traces with X-Ray by default, and these actions take no resource ARN.
+  statement {
+    sid    = "WriteTraces"
+    effect = "Allow"
+
+    actions = [
+      "xray:PutTraceSegments",
+      "xray:PutTelemetryRecords",
+      "xray:GetSamplingRules",
+      "xray:GetSamplingTargets",
+    ]
+
+    resources = ["*"]
+  }
 }
 
 # --- orchestration ---
+
+# What each extraction receives: where the source is and which secret holds its credentials. No secret value is in it.
+locals {
+  extract_input = {
+    sources = [
+      for name, source in var.sources : {
+        name                   = name
+        engine                 = source.engine
+        server_name            = source.server_name
+        port                   = source.port
+        database               = source.database
+        credentials_secret_arn = module.source_credentials[name].arn
+      }
+    ]
+  }
+}
 
 module "extract" {
   source = "../../modules/step-function"
@@ -185,13 +235,51 @@ module "missed_runs" {
   kms_key_id        = module.kms.key_id
   dead_letter_queue = { enabled = false }
 
+  attach_policy = true
+  policy_json   = data.aws_iam_policy_document.missed_runs.json
+
   tags = local.tags
+}
+
+locals {
+  schedule_names = {
+    extract   = format("%s-extract", local.prefix)
+    transform = format("%s-transform", local.prefix)
+  }
+
+  schedule_rule_arns = [
+    for rule, name in local.schedule_names : format("arn:%s:events:%s:%s:rule/%s",
+      data.aws_partition.current.partition, var.region,
+      data.aws_caller_identity.current.account_id, name
+    )
+  ]
+}
+
+# EventBridge can only dead-letter into a queue whose policy lets the failing rule send to it.
+data "aws_iam_policy_document" "missed_runs" {
+  statement {
+    sid       = "AllowScheduleDeadLetters"
+    effect    = "Allow"
+    actions   = ["sqs:SendMessage"]
+    resources = [module.missed_runs.arn]
+
+    principals {
+      type        = "Service"
+      identifiers = ["events.amazonaws.com"]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = local.schedule_rule_arns
+    }
+  }
 }
 
 module "extract_schedule" {
   source = "../../modules/eventbridge-rule"
 
-  name                = format("%s-extract", local.prefix)
+  name                = local.schedule_names.extract
   description         = "Nightly extraction"
   schedule_expression = var.extract_schedule
 
@@ -200,7 +288,7 @@ module "extract_schedule" {
       arn             = module.extract.arn
       role_arn        = module.scheduler_role.arn
       dead_letter_arn = module.missed_runs.arn
-      input           = jsonencode({ sources = keys(var.sources) })
+      input           = jsonencode(local.extract_input)
     }
   }
 
@@ -210,7 +298,7 @@ module "extract_schedule" {
 module "transform_schedule" {
   source = "../../modules/eventbridge-rule"
 
-  name                = format("%s-transform", local.prefix)
+  name                = local.schedule_names.transform
   description         = "Nightly transform, after extraction has had time to finish"
   schedule_expression = var.transform_schedule
 

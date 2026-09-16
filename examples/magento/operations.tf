@@ -4,6 +4,9 @@ module "alerts" {
   name       = format("%s-alerts", local.prefix)
   kms_key_id = module.kms.key_id
 
+  # Alarms and backup job events are the only publishers, and only from this account.
+  publishing_services = local.alert_publishers
+
   subscriptions = var.alert_email == null ? {} : {
     oncall = {
       protocol = "email"
@@ -12,6 +15,10 @@ module "alerts" {
   }
 
   tags = local.tags
+}
+
+locals {
+  alert_publishers = ["cloudwatch.amazonaws.com", "backup.amazonaws.com"]
 }
 
 module "alarms" {

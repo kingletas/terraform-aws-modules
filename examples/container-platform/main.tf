@@ -26,6 +26,9 @@ module "kms" {
 
   service_principals = [format("logs.%s.amazonaws.com", var.region)]
 
+  # The alerts topic is encrypted with this key and CloudWatch alarms publish to it.
+  delivery_service_principals = ["cloudwatch.amazonaws.com"]
+
   tags = local.tags
 }
 
@@ -67,6 +70,7 @@ module "endpoints" {
 # --- security groups ---
 
 module "alb_sg" {
+  # checkov:skip=CKV_AWS_260:Port 80 is open only so the load balancer can redirect HTTP to HTTPS.
   source = "../../modules/security-group"
 
   name        = format("%s-alb", local.prefix)

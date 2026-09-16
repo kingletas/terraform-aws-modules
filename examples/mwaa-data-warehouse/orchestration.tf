@@ -144,6 +144,10 @@ data "aws_iam_policy_document" "airflow" {
   }
 }
 
+locals {
+  airflow_micro = var.airflow_environment_class == "mw1.micro"
+}
+
 module "airflow" {
   source = "../../modules/mwaa-environment"
 
@@ -163,9 +167,10 @@ module "airflow" {
   # is the trade against putting an Airflow UI on the internet.
   webserver_access_mode = "PRIVATE_ONLY"
 
+  # mw1.micro runs exactly one scheduler and one worker.
   min_workers = 1
-  max_workers = var.airflow_max_workers
-  schedulers  = 2
+  max_workers = local.airflow_micro ? 1 : var.airflow_max_workers
+  schedulers  = local.airflow_micro ? 1 : 2
 
   airflow_configuration_options = {
     "core.default_task_retries"       = "2"

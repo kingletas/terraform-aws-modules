@@ -10,6 +10,7 @@ module "api" {
       path              = fn.http_path
       method            = fn.http_method
       lambda_invoke_arn = module.functions[name].invoke_arn
+      authorization     = local.route_authorization
     }
   }
 
@@ -17,6 +18,9 @@ module "api" {
   throttling_burst_limit = var.throttling_rate_limit * 2
 
   kms_key_arn = module.kms.arn
+
+  # Access logging needs the account-level API Gateway logging role.
+  manage_account_cloudwatch_role = var.manage_api_gateway_account_role
 
   tags = local.tags
 }

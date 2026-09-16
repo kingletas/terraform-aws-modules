@@ -27,4 +27,22 @@ run "plans_with_real_values" {
     domain_name      = "app.example.com"
     hosted_zone_name = "example.com"
   }
+
+  assert {
+    condition = alltrue([
+      for service in module.services : anytrue([
+        for entry in service.capacity_provider_strategy : entry.capacity_provider == "FARGATE" && entry.base == 1
+      ])
+    ])
+    error_message = "Every service should keep one task on on-demand Fargate."
+  }
+
+  assert {
+    condition = alltrue([
+      for service in module.services : anytrue([
+        for entry in service.capacity_provider_strategy : entry.capacity_provider == "FARGATE_SPOT" && entry.weight == 3
+      ])
+    ])
+    error_message = "Every service should place most of its other tasks on Fargate Spot."
+  }
 }

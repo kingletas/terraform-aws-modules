@@ -30,6 +30,9 @@ module "kms" {
     "airflow.amazonaws.com",
   ]
 
+  # CloudWatch publishes alarms to the encrypted alert topic.
+  delivery_service_principals = ["cloudwatch.amazonaws.com"]
+
   tags = local.tags
 }
 

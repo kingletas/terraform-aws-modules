@@ -3,6 +3,17 @@ locals {
 
   http_functions = { for name, fn in var.functions : name => fn if fn.http_path != null }
 
+  # Every route is public on purpose: this example has no authorizer, see the README.
+  route_authorization = "NONE"
+
+  # Active tracing needs the X-Ray write access granted in function_managed_policies.
+  function_tracing_mode = "Active"
+
+  function_managed_policies = {
+    lambda_logs = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+    xray        = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
+  }
+
   tags = {
     Environment = var.environment
     Application = var.name
@@ -17,6 +28,9 @@ module "kms" {
   description = "Serverless API data at rest"
 
   service_principals = [format("logs.%s.amazonaws.com", var.region)]
+
+  # The alerts topic is encrypted with this key and CloudWatch alarms publish to it.
+  delivery_service_principals = ["cloudwatch.amazonaws.com"]
 
   tags = local.tags
 }
@@ -86,10 +100,7 @@ module "function_role" {
   description      = "Lambda functions behind the orders API"
   trusted_services = ["lambda.amazonaws.com"]
 
-  managed_policy_arns = {
-    lambda_logs = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-    xray        = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
-  }
+  managed_policy_arns = local.function_managed_policies
 
   inline_policies = {
     orders = data.aws_iam_policy_document.function.json
@@ -158,6 +169,8 @@ module "functions" {
   memory_size = each.value.memory_size
   timeout     = each.value.timeout
   kms_key_arn = module.kms.arn
+
+  tracing_mode = local.function_tracing_mode
 
   environment_variables = merge(each.value.environment, {
     ORDERS_TABLE = module.orders.name

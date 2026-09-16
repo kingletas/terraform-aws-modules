@@ -1,10 +1,8 @@
-# Network hub and spokes
+# network-hub
 
-A shared services VPC with the NAT gateways and endpoints, spoke VPCs with neither, and a transit gateway routing between them so a spoke reaches shared services and the internet but not its siblings.
+A shared services VPC with the NAT gateways and endpoints, spoke VPCs with neither, and a transit gateway routing between them so a spoke reaches shared services and the internet but not its siblings. Optionally, a site-to-site VPN to on-premises attached to the same gateway.
 
-Optionally a site-to-site VPN to on-premises, attached to the same gateway.
-
-## The shape
+## What it builds
 
 ```mermaid
 graph TB
@@ -29,9 +27,61 @@ graph TB
   style ONP stroke:#c85
 ```
 
+- A shared services VPC across two zones, with a NAT gateway per zone.
+- One VPC per entry in `spokes` (`production` and `staging` by default), with no NAT gateway unless the spoke asks for one.
+- A transit gateway with two route tables, `hub` and `spokes`, and the VPC routes that point at it.
+- Seven interface endpoints and the S3 and DynamoDB gateway endpoints in the shared VPC.
+- When `on_premises` is set: a site-to-site VPN attached to the transit gateway, logging to a CloudWatch log group kept for 365 days.
+
+## Before you deploy
+
+- AWS credentials for the target account, and Terraform 1.9 or later.
+- An address plan. Every VPC CIDR must be unique and must not overlap on-premises ranges. See [CIDRs must not overlap](#cidrs-must-not-overlap).
+- For the VPN: the public IP of the on-premises device, its BGP ASN if you use BGP, and the on-premises CIDRs.
+
+## How to use it
+
+```bash
+terraform init
+terraform plan
+terraform apply
+```
+
+To add the VPN, set `on_premises` in a `.tfvars` file:
+
+```hcl
+on_premises = {
+  gateway_ip = "203.0.113.10"
+  bgp_asn    = 65010
+  routes     = ["192.168.0.0/16"]
+}
+```
+
+`routes` is required even with BGP. The VPC route tables are written from it, and routes learned by BGP are not known at plan time.
+
+To run the plan tests against mock providers, without credentials:
+
+```bash
+terraform test
+```
+
+The example's `.tf` files call modules with relative paths (`../../modules/<name>`). A copy used outside this repository should switch each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.3.0`.
+
+The `vpn_configuration` output holds the device configuration, including pre-shared keys. It is marked sensitive; read it with `terraform output -raw vpn_configuration` and hand it over out of band.
+
+## Inputs worth knowing
+
+| Variable | Default | What it changes |
+|---|---|---|
+| `shared_vpc_cidr` | `10.0.0.0/16` | Address range of the hub |
+| `spokes` | `production` (`10.10.0.0/16`), `staging` (`10.20.0.0/16`) | Spoke VPCs; set `enable_nat_gateway = true` on one to give it its own egress |
+| `availability_zones` | first two in the region | Zones every VPC spreads across |
+| `on_premises` | `null` | Site-to-site VPN; `static_routes_only = true` skips BGP |
+| `interface_endpoint_services` | `ssm`, `ssmmessages`, `ec2messages`, `secretsmanager`, `logs`, `ecr.api`, `ecr.dkr` | Interface endpoints in the hub |
+
 ## Association and propagation are the whole design
 
-This is the part that takes a second reading, and getting it backwards produces a full mesh that looks like it works.
+Getting these backwards produces a full mesh that looks like it works.
 
 - **Association** decides which route table an attachment *looks up* routes in. One per attachment.
 - **Propagation** decides which route tables *learn about* that attachment. Any number.
@@ -42,62 +92,61 @@ Here:
 |---|---|---|---|
 | Shared | `hub` | `hub`, `spokes` | Every spoke learns how to reach shared services |
 | Each spoke | `spokes` | `hub` | Shared learns the spoke; **no spoke learns another spoke** |
+| VPN | `hub` | `hub`, `spokes` (by BGP or static route) | On-premises reaches the hub and every spoke |
 
-Because a spoke's routes never propagate into the `spokes` table, production has no route to staging. Not a firewall rule that could be relaxed — no route at all.
+Because a spoke's routes never propagate into the `spokes` table, production learns no route to staging. The `spokes` table does carry a `0.0.0.0/0` route to the shared attachment for internet egress, and that route would carry spoke-to-spoke traffic through the hub. So the table also holds a blackhole route for every spoke CIDR. The more specific blackhole wins, and the traffic is dropped at the gateway rather than filtered by a rule that could be relaxed.
 
-**Both defaults are off** (`default_route_table_association`, `default_route_table_propagation`). Left on, every new attachment silently joins the default table and can reach everything, and nobody notices because nothing failed.
+**Both defaults are off** (`default_route_table_association`, `default_route_table_propagation`). Left on, every new attachment joins the default table and can reach everything, and nothing fails to tell you.
 
 ## Why the spokes have no NAT gateway
 
-A NAT gateway is roughly $32 a month plus data, **per zone**. Three spokes across two zones is six of them, doing the same job.
+A NAT gateway is roughly $32 a month plus data, **per zone**. Three spokes across two zones would be six of them doing the same job.
 
-Here the spokes route `0.0.0.0/0` to the transit gateway, the hub's NAT gateways do the work, and everything egresses from **one set of addresses** — which is also the allow-list you hand a partner, from `nat_public_ips`.
+Here the spokes route `0.0.0.0/0` to the transit gateway, the hub's NAT gateways do the work, and everything egresses from **one set of addresses**. That set is also the allow-list you hand a partner, from `nat_public_ips`.
 
-The trade is real: transit gateway data processing is charged on top of NAT data processing, so traffic crossing the gateway is billed twice. At low egress volume the saved NAT gateways win comfortably. At high volume, per-spoke NAT is cheaper, which is what `enable_nat_gateway` on a spoke is for.
+The trade is real: transit gateway data processing is charged on top of NAT data processing, so traffic crossing the gateway is billed twice. At low egress volume the saved NAT gateways win. At high volume, per-spoke NAT is cheaper, which is what `enable_nat_gateway` on a spoke is for. A spoke with its own NAT gateway still gets explicit routes to on-premises through the transit gateway.
 
 ## Attachments do not create routes
 
-A transit gateway attachment reports `available` and carries nothing until the **VPC** route tables point at it. This example writes those routes explicitly, and it is the single most common reason a fresh transit gateway "does not work".
+A transit gateway attachment reports `available` and carries nothing until the **VPC** route tables point at it. This example writes those routes explicitly: shared private and public tables to each spoke, spoke private tables to `0.0.0.0/0`, and every private table to the on-premises ranges.
 
 Three layers all have to agree:
 
-1. The transit gateway route tables (association and propagation, above)
-2. The VPC subnet route tables, pointing at the gateway
-3. Security groups on both ends, allowing the other's CIDR
+1. The transit gateway route tables (association and propagation, above).
+2. The VPC subnet route tables, pointing at the gateway.
+3. Security groups on both ends, allowing the other's CIDR.
 
 ## Endpoints are centralised, and private DNS is off
 
-Interface endpoints are billed hourly per availability zone. Seven services in three VPCs across two zones is 42 hourly charges; in the hub alone it is 14.
+Interface endpoints are billed hourly per availability zone. Seven services in three VPCs across two zones is 42 hourly charges; in the hub alone it is 14. The endpoint security group allows HTTPS from the shared VPC and every spoke.
 
-`private_dns_enabled = false` is deliberate and it is the catch. With private DNS on, the endpoint's name resolves **only inside the hub VPC**, which defeats the sharing. Making a centralised endpoint usable from a spoke needs a Route 53 private hosted zone per service, associated with every VPC — that is real work and it is **not done here**.
+`private_dns_enabled = false` is deliberate. With private DNS on, the endpoint's name resolves **only inside the hub VPC**, which defeats the sharing. Making a centralised endpoint usable by name from a spoke needs a Route 53 private hosted zone per service, associated with every VPC, and this example does not create those.
 
-Until that exists, a spoke reaches these services through the hub's NAT gateways as normal. The endpoints save the hub's own traffic and are ready to be shared.
+Without them, a spoke reaches these services through the hub's NAT gateways as normal. The endpoints serve the hub's own traffic.
 
-## CIDRs must not overlap, ever
+## CIDRs must not overlap
 
-Two VPCs with overlapping ranges cannot be attached to the same transit gateway, cannot be peered, and cannot be connected later by any means. It is the one decision in this file that cannot be undone without renumbering a live network.
+Two VPCs with overlapping ranges cannot be attached to the same transit gateway or peered, and cannot be connected later without renumbering a live network.
 
-`10.0.0.0/16` for shared and a `/16` per spoke leaves 256 spokes and room to grow. Plan the whole space before the first apply, including the ranges you do not need yet and the on-premises ranges you will have to route to.
+A `/16` for shared and a `/16` per spoke inside `10.0.0.0/8` leaves room for 255 spokes. Plan the whole space before the first apply, including ranges you do not need yet and the on-premises ranges you will route to.
 
-## What it costs
+## Costs
+
+Approximate list prices per month.
 
 | What | Roughly |
 |---|---|
-| Transit gateway attachments, 3 × $36/mo | `██████░░░░` $108 |
+| Transit gateway attachments, 3 × $36 | `██████░░░░` $108 |
 | Transit gateway data processing | `██░░░░░░░░` $0.02/GB |
 | NAT gateways in the hub, 2 zones | `████░░░░░░` $65 + data |
 | Interface endpoints, 7 × 2 zones | `██████░░░░` $100 |
-| Site-to-site VPN | `██░░░░░░░░` $36 + data |
+| Site-to-site VPN, plus its own attachment | `████░░░░░░` $72 + data |
 
-**The attachments and the endpoints are the two lines to watch**, and both scale with how many things you connect rather than with traffic. A hub with two spokes and seven endpoints costs about $270 a month before a byte moves.
+**The attachments and the endpoints are the two lines to watch**, and both scale with how many things you connect rather than with traffic. A hub with two spokes and seven endpoints costs about $270 a month before a byte moves. The S3 and DynamoDB gateway endpoints are free.
 
-## What this does not do
+## Limits
 
-- **No Route 53 resolver rules**, so the centralised endpoints are not yet reachable by name from a spoke. Named above rather than left to be discovered.
-- **No network firewall.** Spoke-to-spoke is blocked by having no route, which is strong. Inspecting traffic that *is* allowed needs AWS Network Firewall and an appliance-mode attachment.
-- **No RAM sharing.** `share_with_principals` on the module attaches VPCs from other accounts; this example is single-account.
-- **No spoke-to-spoke exception.** Where two spokes genuinely must talk, that is a third route table, not a relaxation of these two.
-
-## What is not verified
-
-**Nothing here has been applied against AWS.** Transit gateway routing in particular is one of those things where the configuration is plausible and the traffic still does not flow, so budget time for the first apply.
+- **No Route 53 private hosted zones or resolver rules**, so the centralised endpoints are not reachable by name from a spoke.
+- **No network firewall.** Spoke-to-spoke is blocked by routing. Inspecting traffic that *is* allowed needs AWS Network Firewall and an appliance-mode attachment.
+- **Single account.** The `transit-gateway` module can share the gateway with other accounts through `share_with_principals`; this example does not.
+- **No spoke-to-spoke exception.** Where two spokes must talk, add a third route table rather than relaxing these two.

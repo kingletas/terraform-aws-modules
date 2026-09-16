@@ -34,7 +34,7 @@ module "alb" {
       health_check_path = service.health_path
 
       # Fargate replaces a task rather than restarting it, so draining need
-      # not be long — but it must outlast the slowest in-flight request.
+      # not be long, but it must outlast the slowest in-flight request.
       deregistration_delay = 30
     }
   }

@@ -22,7 +22,8 @@ module "ansible" {
 
   # Over Systems Manager: no bastion, no open port 22, no key to distribute,
   # and it reaches an instance that has no public address.
-  connection = "ssm"
+  connection      = "ssm"
+  ssm_bucket_name = module.ansible_transfer.id
 
   kms_key_arn = module.kms.arn
 
@@ -36,10 +37,13 @@ module "ansible" {
     db_name        = module.database.database_name
     db_secret_arn  = module.database.master_user_secret_arn
 
-    redis_host = module.cache.primary_endpoint_address
-    redis_port = tostring(module.cache.port)
+    redis_host           = module.cache.primary_endpoint_address
+    redis_port           = tostring(module.cache.port)
+    redis_auth_parameter = local.service_credential_paths.cache_auth_token
 
-    search_host = module.search.endpoint
+    search_host               = module.search.endpoint
+    search_user               = local.search_master_user
+    search_password_parameter = local.service_credential_paths.search_password
 
     media_filesystem_id = module.media.id
     static_bucket       = module.static_assets.id

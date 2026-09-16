@@ -68,6 +68,12 @@ variable "throttling_rate_limit" {
   default     = 200
 }
 
+variable "manage_api_gateway_account_role" {
+  type        = bool
+  description = "Create the API Gateway CloudWatch logging role and set it on the account. Stage access logging fails without it; leave off where the account already has one."
+  default     = false
+}
+
 variable "alert_email" {
   type        = string
   description = "Address receiving alarm notifications. It must be confirmed by hand."

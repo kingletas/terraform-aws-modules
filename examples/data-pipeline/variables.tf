@@ -31,7 +31,7 @@ variable "sources" {
     username    = string
     description = optional(string)
   }))
-  description = "Source systems to ingest from, keyed by name. Passwords are not here; each source gets a secret you populate out of band."
+  description = "Source systems to ingest from, keyed by name. Each run passes the name, engine, server_name, port, database and the credentials secret ARN to the extraction. Passwords are not here; each source gets a secret you populate out of band."
   default     = {}
 }
 

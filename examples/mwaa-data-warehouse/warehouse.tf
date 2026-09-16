@@ -15,13 +15,35 @@ module "dags" {
   tags = merge(local.tags, { Purpose = "airflow-dags" })
 }
 
-module "warehouse_logs" {
+locals {
+  staging_bucket    = format("%s-staging-%s", local.prefix, data.aws_caller_identity.current.account_id)
+  audit_logs_bucket = format("%s-logs-%s", local.prefix, data.aws_caller_identity.current.account_id)
+  warehouse_cluster_arn = format("arn:%s:redshift:%s:%s:cluster:%s",
+    data.aws_partition.current.partition, var.region,
+    data.aws_caller_identity.current.account_id, local.prefix
+  )
+}
+
+# COPY and UNLOAD read and write here; audit logs never do.
+module "staging" {
   source = "../../modules/s3-bucket"
 
-  name = format("%s-logs-%s", local.prefix, data.aws_caller_identity.current.account_id)
+  name        = local.staging_bucket
+  kms_key_arn = module.kms.arn
+
+  tags = merge(local.tags, { Purpose = "warehouse-staging" })
+}
+
+# SSE-S3 rather than the customer key, because Redshift audit logging cannot write to a bucket encrypted with one.
+module "audit_logs" {
+  source = "../../modules/s3-bucket"
+
+  name = local.audit_logs_bucket
 
   # Redshift audit logging writes with an ACL, which BucketOwnerEnforced forbids.
   object_ownership = "BucketOwnerPreferred"
+
+  policy_documents = [data.aws_iam_policy_document.redshift_audit_logging.json]
 
   lifecycle_rules = {
     expire = {
@@ -30,6 +52,43 @@ module "warehouse_logs" {
   }
 
   tags = merge(local.tags, { Purpose = "redshift-audit" })
+}
+
+# A stack that already has the log bucket keeps it, with its logs, as the audit bucket.
+moved {
+  from = module.warehouse_logs
+  to   = module.audit_logs
+}
+
+# Redshift checks the bucket ACL and writes its audit logs as the service, for this cluster only.
+data "aws_iam_policy_document" "redshift_audit_logging" {
+  statement {
+    sid     = "AllowRedshiftAuditLogging"
+    effect  = "Allow"
+    actions = ["s3:PutObject", "s3:GetBucketAcl"]
+
+    resources = [
+      format("arn:%s:s3:::%s", data.aws_partition.current.partition, local.audit_logs_bucket),
+      format("arn:%s:s3:::%s/*", data.aws_partition.current.partition, local.audit_logs_bucket),
+    ]
+
+    principals {
+      type        = "Service"
+      identifiers = ["redshift.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceArn"
+      values   = [local.warehouse_cluster_arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
 }
 
 # --- source credentials, created empty ---
@@ -61,7 +120,7 @@ module "redshift_role" {
   source = "../../modules/iam-role"
 
   name             = format("%s-redshift", local.prefix)
-  description      = "Redshift COPY and UNLOAD against the warehouse buckets"
+  description      = "Redshift COPY and UNLOAD against the staging bucket"
   trusted_services = ["redshift.amazonaws.com"]
 
   inline_policies = {
@@ -73,10 +132,13 @@ module "redshift_role" {
 
 data "aws_iam_policy_document" "redshift" {
   statement {
-    sid       = "ReadWriteStaging"
-    effect    = "Allow"
-    actions   = ["s3:GetObject", "s3:PutObject", "s3:ListBucket", "s3:DeleteObject"]
-    resources = [module.warehouse_logs.arn, format("%s/*", module.warehouse_logs.arn)]
+    sid     = "ReadWriteStaging"
+    effect  = "Allow"
+    actions = ["s3:GetObject", "s3:PutObject", "s3:ListBucket", "s3:DeleteObject"]
+    resources = [
+      format("arn:%s:s3:::%s", data.aws_partition.current.partition, local.staging_bucket),
+      format("arn:%s:s3:::%s/*", data.aws_partition.current.partition, local.staging_bucket),
+    ]
   }
 
   statement {
@@ -102,7 +164,8 @@ module "warehouse" {
   iam_role_arns        = [module.redshift_role.arn]
   default_iam_role_arn = module.redshift_role.arn
 
-  logging = { bucket = module.warehouse_logs.id }
+  # The id output waits for the bucket policy, so logging starts only once Redshift may write.
+  logging = { bucket = module.audit_logs.id }
 
   # COPY and UNLOAD stay inside the VPC, where the security groups and the S3
   # gateway endpoint apply to them. Off, that traffic leaves over the internet.
@@ -174,6 +237,12 @@ module "replication" {
   kms_key_arn        = module.kms.arn
 
   secrets_access_role_arn = module.dms_secrets_role.arn
+
+  # DMS needs dms-vpc-role before it can place an instance in a VPC, and only one configuration per account may own it.
+  create_service_roles = var.create_dms_service_roles
+
+  # The Redshift target stages and loads through dms-access-for-endpoint.
+  create_endpoint_access_role = var.create_dms_endpoint_access_role
 
   # The line that decides whether a private DMS task connects at all.
   secrets_manager_endpoint_dns = module.endpoints.interface_dns_names["secretsmanager"][0].dns_name

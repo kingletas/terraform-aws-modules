@@ -51,20 +51,23 @@ module "database" {
 
 # --- cluster ---
 
+locals {
+  # One task per service stays on on-demand Fargate whatever the spot market
+  # does, and three in four of the rest run on Fargate Spot.
+  capacity_provider_strategy = [
+    { capacity_provider = "FARGATE", base = 1, weight = 1 },
+    { capacity_provider = "FARGATE_SPOT", weight = 3 },
+  ]
+}
+
 module "cluster" {
   source = "../../modules/ecs-cluster"
 
   name        = local.prefix
   kms_key_arn = module.kms.arn
 
-  capacity_providers = ["FARGATE", "FARGATE_SPOT"]
-
-  # Two tasks stay on on-demand whatever the spot market does, so a spot
-  # reclamation event cannot take the whole service with it.
-  default_capacity_provider_strategy = [
-    { capacity_provider = "FARGATE", base = 2, weight = 1 },
-    { capacity_provider = "FARGATE_SPOT", weight = 3 },
-  ]
+  capacity_providers                 = ["FARGATE", "FARGATE_SPOT"]
+  default_capacity_provider_strategy = local.capacity_provider_strategy
 
   tags = local.tags
 }
@@ -150,6 +153,10 @@ module "services" {
 
   cpu    = each.value.cpu
   memory = each.value.memory
+
+  capacity = {
+    capacity_provider_strategy = local.capacity_provider_strategy
+  }
 
   subnet_ids         = values(module.vpc.private_subnet_ids)
   security_group_ids = [module.task_sg.id]

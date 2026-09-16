@@ -4,6 +4,9 @@ module "security_alerts" {
   name       = format("%s-security", local.prefix)
   kms_key_id = module.kms.key_id
 
+  # Alarms and backup job events are the only publishers, and only from this account.
+  publishing_services = local.security_topic_publishers
+
   subscriptions = var.alert_email == null ? {} : {
     security = {
       protocol = "email"
@@ -12,6 +15,11 @@ module "security_alerts" {
   }
 
   tags = local.tags
+}
+
+# The key already lets backup.amazonaws.com use it, so only the topic needs this list.
+locals {
+  security_topic_publishers = ["cloudwatch.amazonaws.com", "backup.amazonaws.com"]
 }
 
 module "security_alarms" {

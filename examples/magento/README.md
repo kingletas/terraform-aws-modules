@@ -1,10 +1,8 @@
-# Magento on AWS
+# magento
 
-A complete Adobe Commerce stack: CloudFront at the edge, an autoscaling web tier, the two nodes Magento genuinely cannot replicate, Aurora, Valkey, OpenSearch and EFS — with configuration discovered rather than written down.
+A complete Adobe Commerce (Magento) stack: CloudFront at the edge, an autoscaling web tier, the two nodes Magento cannot replicate, and Aurora, Valkey, OpenSearch and EFS behind them. Configuration is discovered by tag rather than written down, so it stays correct as the web tier scales.
 
-One example rather than two, because the interesting question is not "pets or cattle" but **which parts of Magento are which**.
-
-## The shape
+## What it builds
 
 ```mermaid
 graph TB
@@ -36,44 +34,130 @@ graph TB
   style SSM stroke:#9a4
 ```
 
-## What is cattle and what is a pet
+- A VPC across two zones, with flow logs and endpoints for `ssm`, `ssmmessages`, `ec2messages`, `secretsmanager`, `logs` and S3.
+- A web tier in an autoscaling group, scaling on CPU and released by instance refresh.
+- A `cron` node and an `admin` node, plus an optional `builder` node.
+- Aurora MySQL 8.0 Serverless v2, Valkey 8 with TLS and an auth token, OpenSearch 2.17, and EFS for `pub/media`.
+- An application load balancer that accepts only CloudFront, a CloudFront distribution with a WAF in `us-east-1`, and certificates for the storefront and origin names.
+- An Ansible dynamic inventory and group variables written to `ansible/`, and the stack's endpoints published to one SSM parameter.
+- Alarms, a CloudWatch dashboard, an SNS alerts topic, and an AWS Backup plan for resources tagged `Backup = true`.
 
-The web tier autoscales and is replaced by an instance refresh. Two things cannot be:
+## Before you deploy
 
-| | Why it cannot be replicated |
-|---|---|
-| **cron** | Two nodes running `bin/magento cron:run` claim the same `cron_schedule` rows. The symptoms are duplicate order confirmation emails, indexers stuck in `working` forever, and a consumer queue draining at half speed while both workers fight |
-| **admin** | Not a correctness problem — a capacity one. A slow report or a mass attribute update should not take PHP workers away from checkout |
+- **A public Route 53 hosted zone** for the storefront domain, in the same account. The example creates `<domain>` and `origin.<domain>` records and validates both certificates through it.
+- **A base AMI.** It needs PHP and Magento's extensions, the SSM agent, the CloudWatch agent, `amazon-efs-utils` (the boot script mounts EFS with `mount -t efs -o tls`) and a web server answering `/health_check.php` on port 80. The default node user is `ubuntu`. The default instance types are Graviton (`c7g`) for staging, uat and production, so the AMI must be arm64 there; `dev` uses `t3.large`, which needs x86_64.
+- **The account baseline.** EBS encryption defaults, the account public access block and the password policy belong in [`account-baseline`](../account-baseline), applied once per account.
+- AWS credentials, Terraform 1.9 or later, and for configuration: Ansible with the `amazon.aws` collection and the Session Manager plugin.
 
-If the cron node dies, the site keeps serving and orders keep taking; you stop reindexing. That is the right failure mode and it is why the `cron-down` alarm treats missing data as breaching — a stopped singleton produces no metric, and silence must not read as health.
+## How to use it
 
-`include_builder` adds a third, and is **off by default**: where CI builds the AMI there is nothing for a builder to do, and an idle `c7g.2xlarge` is an expensive way to have nothing.
+```bash
+cp terraform.tfvars.example terraform.tfvars
+# set domain_name, hosted_zone_name and ami_id
+terraform init
+terraform plan
+terraform apply
+```
 
-## CloudFront, not a Varnish tier
+`terraform.tfvars` is gitignored. To run the plan tests against mock providers, without credentials:
 
-Varnish on a node in front of the web tier is the traditional Magento answer and it is not the best one on AWS:
+```bash
+terraform test
+```
 
-- CloudFront caches at **the edge**, not in one region
-- It needs no instances to patch, no purge broadcast to every node, no tier that can itself fall over
-- Magento's own full page cache in Redis already does what Varnish was doing behind the load balancer
+The tests plan both the staging defaults and production with the builder node.
 
-The `/static/*` behaviour goes straight to S3, so static content never touches PHP at all. What is lost is Varnish's VCL — if you have edge logic that genuinely needs it, a CloudFront Function is where it goes.
+The example's `.tf` files call modules with relative paths (`../../modules/<name>`). A copy used outside this repository should switch each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.3.0`.
 
-## There is no bastion
+### Configure the nodes
 
-SSH is closed everywhere. The `ssm`, `ssmmessages` and `ec2messages` VPC endpoints let Session Manager reach an instance in a private subnet with no public address, no open port and no key to distribute:
+Apply writes `ansible/aws_ec2.yml` (the dynamic inventory) and `ansible/group_vars/` into this directory. Both are gitignored. Run your own playbook against them:
+
+```bash
+ansible-playbook -i ansible/aws_ec2.yml site.yml
+```
+
+### Get a shell
+
+SSH is closed everywhere. Session Manager reaches an instance in a private subnet with no public address, no open port and no key:
 
 ```bash
 aws ssm start-session --target i-0123456789abcdef0
 ```
 
-A bastion is a host to patch, a key to rotate, and an address somebody eventually allow-lists too broadly. Systems Manager removes all three.
+### Release a new version
 
-## Configuration is discovered, not written
+A release is a new AMI:
 
-This is the part that decides whether the stack stays correct.
+```bash
+terraform apply -var="ami_id=ami-0fedcba9876543210"
+```
 
-**Half of it is an autoscaling group.** Those instances do not exist when Terraform plans, and any host list written at apply time is wrong the first time the group scales. So the inventory is a *rule*, not a list:
+The web tier rolls through an instance refresh at 100% minimum healthy with a ten-minute warmup. **The `cron`, `admin` and `builder` nodes keep the AMI they were built from**, so a release never replaces the cron node while the web tier is half rolled or the database is half migrated.
+
+When the web tier has finished and the database is migrated, roll the singletons onto the same AMI:
+
+```bash
+terraform apply -var="ami_id=ami-0fedcba9876543210" -replace=terraform_data.singleton_ami
+```
+
+Each singleton is stopped before its replacement starts, so cron does not run for a few minutes. Time it so the cron node is not replaced in the middle of a run.
+
+Then invalidate what changed:
+
+```bash
+aws cloudfront create-invalidation --distribution-id "$(terraform output -raw cdn_distribution_id)" --paths '/' '/index.php'
+```
+
+Invalidate narrowly. Content-hashed asset names never need it.
+
+## Inputs worth knowing
+
+| Variable | Default | What it changes |
+|---|---|---|
+| `domain_name` | none | Storefront domain |
+| `hosted_zone_name` | none | Route 53 zone holding that domain |
+| `ami_id` | none | Base AMI for the web tier, and for the singletons when they are created or replaced |
+| `environment` | `staging` | `dev`, `staging`, `uat` or `production`; decides sizing, retention and guards |
+| `project` | `storefront` | Names every resource and is a discovery tag for Ansible |
+| `instance_types` | `t3.large` dev, `c7g.large` staging and uat, `c7g.xlarge` production | Instance type per environment, used by the web tier and the singletons |
+| `web_capacity` | environment default | Override `min`, `desired` or `max` for the web tier |
+| `include_builder` | `false` | Add a `c7g.2xlarge` builder node with a 200 GiB workspace volume |
+| `enable_waf` | `true` | Put the WAF in front of CloudFront |
+| `alert_email` | `null` | Email subscribed to alarms; the subscription must be confirmed from the inbox |
+
+## Design notes
+
+### What is cattle and what is a pet
+
+The web tier autoscales and is replaced by an instance refresh. Two jobs cannot be:
+
+| | Why it cannot be replicated |
+|---|---|
+| **cron** | Two nodes running `bin/magento cron:run` claim the same `cron_schedule` rows. The symptoms are duplicate order confirmation emails, indexers stuck in `working`, and a consumer queue draining at half speed while both workers compete |
+| **admin** | A capacity problem rather than a correctness one. A slow report or a mass attribute update should not take PHP workers away from checkout |
+
+If the cron node dies, the site keeps serving and taking orders; indexing stops. That is the right failure mode, and it is why each singleton's `-down` alarm treats missing data as breaching: a stopped instance produces no metric, and silence must not read as health.
+
+`include_builder` adds a third singleton and is **off by default**. Where CI builds the AMI there is nothing for a builder to do, and an idle `c7g.2xlarge` is an expensive way to do nothing.
+
+### CloudFront, not a Varnish tier
+
+Varnish in front of the web tier is the traditional Magento answer. On AWS, CloudFront is the better fit:
+
+- CloudFront caches at the edge, not in one region.
+- It needs no instances to patch, no purge broadcast to every node, and no tier that can itself fall over.
+- Magento's own full page cache in Valkey covers what Varnish did behind the load balancer.
+
+The `/static/*` behaviour goes straight to S3, so static content never touches PHP. `/media/*` is cached from the origin. What is lost is Varnish's VCL; edge logic that needs it goes in a CloudFront Function.
+
+### The load balancer answers only CloudFront
+
+The load balancer has no port 80 listener, and its security group accepts HTTPS only from CloudFront's origin-facing managed prefix list. CloudFront adds an `X-Origin-Verify` header carrying a generated secret, and the only listener rule that forwards to the web tier requires it. Any other request, including one from another CloudFront distribution, gets a 403.
+
+### Configuration is discovered, not written
+
+**Half the stack is an autoscaling group.** Those instances do not exist when Terraform plans, and a host list written at apply time is wrong the first time the group scales. So the inventory is a rule, not a list:
 
 ```yaml
 plugin: amazon.aws.aws_ec2
@@ -84,73 +168,51 @@ keyed_groups:
   - key: tags.Role
 ```
 
-A node joins the `web` group by existing and carrying the tags — which the `context` module puts on everything. Ansible reaches it over Systems Manager, so this works with no key and no open port.
+A node joins its group (`web`, `cron`, `admin`, `builder`) by existing and carrying its `Role` tag. Ansible connects over Systems Manager, moving files through a dedicated S3 bucket, so this needs no key and no open port.
 
-**Facts go to SSM Parameter Store, not to a file.** Every operator and every CI runner reads the same values, and a stale copy on somebody's laptop cannot exist:
+**Facts go to SSM Parameter Store, not to a file.** Every operator and every CI runner reads the same values. `terraform output ansible_facts_parameter` names the parameter. The same endpoints are written to `/etc/magento/environment` on each node at boot.
 
-```bash
-ansible-playbook -i ansible/aws_ec2.yml site.yml
-```
+**Nothing secret is in the facts.** They carry the *ARN* of the database secret and the *names* of two SSM SecureString parameters holding the Valkey auth token and the OpenSearch master password. A node reads the values at runtime through its instance profile, which can read those three and nothing else. The same names are in `/etc/magento/environment` as `MAGENTO_DB_SECRET_ARN`, `MAGENTO_REDIS_AUTH_PARAMETER` and `MAGENTO_SEARCH_PASSWORD_PARAMETER`. `env.php` needs the Valkey token, with `scheme => tls`, for both the cache and the session handler.
 
-**Nothing secret is in the facts.** They carry the *ARN* of the database secret; the node reads the value at runtime through its instance profile.
+### Environment separation is one variable
 
-## Environment separation is one variable
-
-```bash
-terraform apply -var="environment=staging"
-```
-
-Single-AZ Aurora with no reader, `cache.t4g.micro`, one search node, one NAT gateway, 7-day backups, no deletion protection, 1–4 web nodes, `PriceClass_100`.
-
-```bash
-terraform apply -var="environment=production"
-```
-
-Multi-AZ Aurora with a reader, `cache.r7g.large` with a replica, two search nodes across zones, a NAT gateway per zone, 30-day backups, deletion protection on, 2–12 web nodes, `PriceClass_200`, and `Backup = true` on every resource so the backup plan picks them up.
-
-**There is no `if production` in this stack beyond reading those defaults.** They live in one table in [`context`](../../modules/context).
-
-## Deploying
-
-A release is a new AMI and an instance refresh:
-
-```bash
-terraform apply -var="ami_id=ami-0fedcba9876543210"
-```
-
-The autoscaling group rolls at 100% minimum healthy with a ten-minute warmup. The singletons are **not** rolled automatically — replacing the cron node mid-run is not something to do without looking, so it is a deliberate taint.
-
-Then invalidate what changed:
-
-```bash
-aws cloudfront create-invalidation --distribution-id "$(terraform output -raw cdn_distribution_id)" --paths '/' '/index.php'
-```
-
-Invalidate narrowly. Content-hashed asset names never need it at all.
-
-## What it costs
+The `context` module holds one table of per-environment defaults, and nothing in this stack checks the environment beyond reading it. See [`context`](../../modules/context).
 
 | | staging | production |
 |---|---|---|
-| Web tier | 1–4 × `c7g.large` | 2–12 × `c7g.xlarge` |
-| Singletons | 2 | 2 |
-| Aurora | 1 × 0.5–8 ACU | 2 × 2–32 ACU |
+| Aurora | single writer, 0.5 to 8 ACU | writer and reader, 2 to 32 ACU |
+| Cache | `cache.t4g.micro`, no replica | `cache.r7g.large` with a replica |
+| Search | one `t3.small.search` node | two `r7g.large.search` nodes across zones |
+| NAT gateways | one | one per zone |
+| Web nodes | 1 to 4 | 2 to 12 |
+| Backups | 7 days | 30 days, and `Backup = true` on every resource |
+| Deletion protection | off | on |
+| CloudFront price class | `PriceClass_100` | `PriceClass_200` |
+
+`dev` and `uat` are single-AZ like staging. `dev` keeps 1-day backups and 1 to 2 web nodes; `uat` keeps 14-day backups, 2 to 4 web nodes and turns deletion protection on.
+
+## Costs
+
+Rough monthly figures at the default desired capacity, before traffic, data transfer and discounts.
+
+| | staging | production |
+|---|---|---|
+| Web tier | 1 to 4 × `c7g.large` | 2 to 12 × `c7g.xlarge` |
+| Singletons | 2 × `c7g.large` | 2 × `c7g.xlarge` |
+| Aurora | 1 × 0.5 to 8 ACU | 2 × 2 to 32 ACU |
 | Cache | `cache.t4g.micro` | `cache.r7g.large` × 2 |
 | Search | 1 × `t3.small.search` | 2 × `r7g.large.search` |
 | NAT | one | one per zone |
-| WAF | $6 + rules | $6 + rules |
+| WAF | $5 + six rules at $1 | $5 + six rules at $1 |
 | **Roughly** | `███░░░░░░░` $450 | `██████████` $1,900 |
 
-**The NAT gateways and the search tier are the two lines worth questioning.** Production runs one NAT per zone for availability; the VPC endpoints keep S3 and Systems Manager traffic off them either way.
+**The NAT gateways and the search tier are the two lines worth questioning.** Production runs a NAT gateway per zone for availability; the VPC endpoints keep S3 and Systems Manager traffic off them either way.
 
-## What this does not do
+## Limits
 
-- **No Ansible playbooks.** The inventory and the facts are generated; `site.yml` is yours. What is proved here is that the seam is defined.
+- **No Ansible playbooks.** The inventory, group variables and facts are generated; `site.yml` is yours.
 - **No AMI pipeline.** Nothing builds the image, and the image is the unit of deployment.
-- **No origin verification enforcement.** CloudFront sends `X-Origin-Verify`; making the load balancer *require* it needs a listener rule that returns 403 without it. The secret is generated and the rule is not written.
-- **No read/write splitting.** Both endpoints are published; pointing Magento's read connection at the reader is an `env.php` change.
-- **No account baseline.** EBS encryption defaults, the account public access block and the password policy belong in [`account-baseline`](../account-baseline), applied once per account — not from an application stack, where two stacks would fight over the same settings.
-
-## What is not verified
-
-**Nothing here has been applied against AWS.** It validates, composes modules that validate, and passes checkov. The dynamic inventory has not been fed to a real Ansible run.
+- **The Valkey token and OpenSearch password are also in Terraform state.** Terraform generates them, so the state holds them. Keep the state encrypted and access to it narrow.
+- **No read/write splitting.** Both database endpoints are published; pointing Magento's read connection at the reader is an `env.php` change.
+- **The WAF common rule set only counts.** `AWSManagedRulesCommonRuleSet` is in count mode because it has false positives against Magento's admin. The other managed groups and both rate limits (100 requests per five minutes per IP on `/admin`, 3,000 on everything) block.
+- **No account baseline.** It belongs in [`account-baseline`](../account-baseline), not in an application stack, where two stacks would fight over the same settings.

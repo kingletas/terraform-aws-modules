@@ -1,13 +1,18 @@
 data "aws_caller_identity" "current" {}
 
+data "aws_partition" "current" {}
+
 data "aws_route53_zone" "this" {
   name         = var.hosted_zone_name
   private_zone = false
 }
 
 locals {
-  prefix      = format("%s-%s", var.name, var.environment)
-  all_domains = concat([var.domain_name], var.additional_domains)
+  prefix = format("%s-%s", var.name, var.environment)
+
+  # The content policy names its bucket by ARN, which cannot come from the module that waits for that policy.
+  content_bucket = format("%s-content-%s", local.prefix, data.aws_caller_identity.current.account_id)
+  all_domains    = concat([var.domain_name], var.additional_domains)
 
   tags = {
     Environment = var.environment
@@ -21,11 +26,13 @@ locals {
 module "content" {
   source = "../../modules/s3-bucket"
 
-  name = format("%s-content-%s", local.prefix, data.aws_caller_identity.current.account_id)
+  name = local.content_bucket
 
   # No customer key. CloudFront reads objects through origin access control,
   # and a customer-managed key means adding CloudFront to the key policy too.
   versioning_enabled = true
+
+  policy_documents = [data.aws_iam_policy_document.content.json]
 
   lifecycle_rules = {
     expire_old_deploys = {
@@ -151,7 +158,7 @@ module "cdn" {
   tags = local.tags
 }
 
-# --- the policy the module deliberately does not write ---
+# --- the grant merged into the content bucket's policy ---
 
 # Only this distribution may read the bucket. Without it every request is a 403
 # and the site looks broken rather than unauthorised.
@@ -160,7 +167,7 @@ data "aws_iam_policy_document" "content" {
     sid       = "AllowCloudFrontRead"
     effect    = "Allow"
     actions   = ["s3:GetObject"]
-    resources = [format("%s/*", module.content.arn)]
+    resources = [format("arn:%s:s3:::%s/*", data.aws_partition.current.partition, local.content_bucket)]
 
     principals {
       type        = "Service"
@@ -173,11 +180,6 @@ data "aws_iam_policy_document" "content" {
       values   = [module.cdn.arn]
     }
   }
-}
-
-resource "aws_s3_bucket_policy" "content" {
-  bucket = module.content.id
-  policy = data.aws_iam_policy_document.content.json
 }
 
 # --- names ---

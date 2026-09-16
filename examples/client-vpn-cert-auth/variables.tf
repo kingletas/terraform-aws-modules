@@ -36,19 +36,19 @@ variable "server_private_key" {
 
 variable "client_root_certificate_body" {
   type        = string
-  description = "PEM body of the client certificate authority."
+  description = "PEM body of a client certificate issued by the certificate authority in certificate_chain."
   sensitive   = true
 }
 
 variable "client_root_private_key" {
   type        = string
-  description = "PEM private key for the client certificate authority."
+  description = "PEM private key for that client certificate."
   sensitive   = true
 }
 
 variable "certificate_chain" {
   type        = string
-  description = "PEM certificate authority chain shared by both certificates."
+  description = "PEM certificate of the authority that issued both certificates. The endpoint accepts every client certificate this authority signed."
   sensitive   = true
 }
 

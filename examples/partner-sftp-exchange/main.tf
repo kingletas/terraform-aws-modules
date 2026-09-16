@@ -18,6 +18,9 @@ module "kms" {
 
   service_principals = [format("logs.%s.amazonaws.com", var.region)]
 
+  # CloudWatch alarms and AWS Backup job events publish to the encrypted alert topic.
+  delivery_service_principals = ["cloudwatch.amazonaws.com", "backup.amazonaws.com"]
+
   tags = local.tags
 }
 
@@ -56,6 +59,8 @@ module "sftp" {
   bucket_name = module.exchange.id
   kms_key_arn = module.kms.arn
 
+  bucket_kms_key = { arn = module.kms.arn }
+
   protocols     = ["SFTP"]
   endpoint_type = "PUBLIC"
 
@@ -82,6 +87,9 @@ module "backups" {
 
   name              = local.prefix
   vault_kms_key_arn = module.kms.arn
+
+  # The exchange bucket is S3 under the customer key, which the key policy lets IAM grant.
+  s3_backup_enabled = true
 
   rules = {
     daily = {
@@ -110,6 +118,9 @@ module "alerts" {
   name       = format("%s-alerts", local.prefix)
   kms_key_id = module.kms.key_id
 
+  # Alarms and backup job events are the only publishers, and only from this account.
+  publishing_services = local.alert_publishers
+
   subscriptions = var.alert_email == null ? {} : {
     oncall = {
       protocol = "email"
@@ -120,6 +131,41 @@ module "alerts" {
   tags = local.tags
 }
 
+locals {
+  alert_publishers = ["cloudwatch.amazonaws.com", "backup.amazonaws.com"]
+}
+
+locals {
+  auth_failure_namespace = format("PartnerExchange/%s", local.prefix)
+
+  # Only failures naming a real partner, so the background of scanners guessing usernames stays silent.
+  auth_failure_pattern = format("{ $.activity-type = \"AUTH_FAILURE\" && (%s) }",
+    join(" || ", [for username in sort(keys(var.partners)) : format("$.user = \"%s\"", username)])
+  )
+}
+
+# AWS/Transfer publishes no authentication metric, so the structured transfer log is counted instead.
+resource "aws_cloudwatch_log_metric_filter" "auth_failures" {
+  name           = format("%s-partner-auth-failures", local.prefix)
+  log_group_name = module.sftp.log_group_name
+  pattern        = local.auth_failure_pattern
+
+  metric_transformation {
+    name          = "PartnerAuthFailures"
+    namespace     = local.auth_failure_namespace
+    value         = "1"
+    default_value = "0"
+    unit          = "Count"
+  }
+
+  lifecycle {
+    precondition {
+      condition     = length(local.auth_failure_pattern) <= 1024
+      error_message = "Too many partners for one metric filter pattern, which CloudWatch Logs caps at 1024 characters."
+    }
+  }
+}
+
 module "alarms" {
   source = "../../modules/cloudwatch-alarm"
 
@@ -128,17 +174,16 @@ module "alarms" {
 
   alarms = merge(
     {
-      # Somebody is trying keys against the server.
-      "${local.prefix}-auth-failures" = {
-        description         = "Repeated SFTP authentication failures"
-        metric_name         = "FilesIn"
-        namespace           = "AWS/Transfer"
+      # A partner whose key stopped working, or somebody trying keys against a real partner account.
+      "${local.prefix}-partner-auth-failures" = {
+        description         = "Repeated SFTP authentication failures against a partner username"
+        metric_name         = aws_cloudwatch_log_metric_filter.auth_failures.metric_transformation[0].name
+        namespace           = local.auth_failure_namespace
         statistic           = "Sum"
-        comparison_operator = "LessThanThreshold"
-        threshold           = 0
+        comparison_operator = "GreaterThanOrEqualToThreshold"
+        threshold           = 5
         evaluation_periods  = 1
         treat_missing_data  = "notBreaching"
-        dimensions          = { ServerId = module.sftp.id }
       }
     },
 

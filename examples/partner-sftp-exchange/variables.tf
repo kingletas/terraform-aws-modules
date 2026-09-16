@@ -20,7 +20,6 @@ variable "partners" {
   type = map(object({
     public_keys = list(string)
     read_only   = optional(bool, false)
-    description = optional(string)
   }))
   description = "Partners keyed by username. Each is confined to its own prefix in the bucket."
 }

@@ -7,10 +7,6 @@ vpc_cidr          = "10.20.0.0/16"
 client_cidr_block = "10.100.0.0/22"
 environment       = "sandbox"
 
-# Read the PEM material from disk rather than pasting it here:
-#   terraform apply \
-#     -var="server_certificate_body=$(cat pki/issued/server.crt)" \
-#     -var="server_private_key=$(cat pki/private/server.key)" \
-#     -var="client_root_certificate_body=$(cat pki/issued/client.crt)" \
-#     -var="client_root_private_key=$(cat pki/private/client.key)" \
-#     -var="certificate_chain=$(cat pki/ca.crt)"
+# Do not put certificate material in this file. Export it as environment
+# variables instead, as the README shows:
+#   export TF_VAR_server_private_key="$(cat pki/private/server.key)"

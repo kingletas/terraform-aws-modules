@@ -94,7 +94,7 @@ module "search" {
   kms_key_arn        = module.kms.arn
 
   master_user = {
-    name     = "opensearch"
+    name     = local.search_master_user
     password = random_password.search.result
   }
 
@@ -110,8 +110,42 @@ resource "random_password" "search" {
   min_numeric      = 2
 }
 
+locals {
+  search_master_user = "opensearch"
+
+  service_credential_paths = {
+    cache_auth_token = format("/%s/cache/auth-token", local.prefix)
+    search_password  = format("/%s/search/master-password", local.prefix)
+  }
+}
+
+# The generated credentials, readable by the nodes by parameter name.
+module "service_credentials" {
+  source = "../../modules/ssm-parameter"
+
+  parameters = {
+    (local.service_credential_paths.cache_auth_token) = {
+      type        = "SecureString"
+      description = "Valkey auth token for the cache and the session handler"
+    }
+    (local.service_credential_paths.search_password) = {
+      type        = "SecureString"
+      description = "OpenSearch master user password"
+    }
+  }
+
+  values = {
+    (local.service_credential_paths.cache_auth_token) = random_password.cache.result
+    (local.service_credential_paths.search_password)  = random_password.search.result
+  }
+
+  kms_key_arn = module.kms.arn
+
+  tags = local.tags
+}
+
 # pub/media must be one directory across every node, or an image uploaded
-# through the admin is a 404 on every other node — and with an autoscaling
+# through the admin is a 404 on every other node. With an autoscaling
 # tier, the node holding it is also the one that gets terminated.
 module "media" {
   source = "../../modules/efs-filesystem"
@@ -139,11 +173,19 @@ module "media" {
   tags = local.tags
 }
 
+# Bucket policies name their own bucket by ARN, which cannot come from the module that waits for that policy.
+locals {
+  static_assets_bucket = format("%s-static-%s", local.prefix, data.aws_caller_identity.current.account_id)
+  cdn_logs_bucket      = format("%s-cdn-logs-%s", local.prefix, data.aws_caller_identity.current.account_id)
+}
+
 module "static_assets" {
   source = "../../modules/s3-bucket"
 
-  name        = format("%s-static-%s", local.prefix, data.aws_caller_identity.current.account_id)
+  name        = local.static_assets_bucket
   kms_key_arn = module.kms.arn
+
+  policy_documents = [data.aws_iam_policy_document.static.json]
 
   lifecycle_rules = {
     expire_old_deploys = {
@@ -158,15 +200,48 @@ module "static_assets" {
 module "cdn_logs" {
   source = "../../modules/s3-bucket"
 
-  name = format("%s-cdn-logs-%s", local.prefix, data.aws_caller_identity.current.account_id)
+  name = local.cdn_logs_bucket
 
   # CloudFront access logging writes with an ACL, which BucketOwnerEnforced
   # forbids. The looser setting is confined to a bucket holding only logs.
   object_ownership = "BucketOwnerPreferred"
 
+  policy_documents = [data.aws_iam_policy_document.alb_logs.json]
+
   lifecycle_rules = {
     expire = {
       expiration_days = local.defaults.log_retention_days
+    }
+  }
+
+  tags = local.tags
+}
+
+# Load balancer access logs, written only under this account's prefix.
+data "aws_iam_policy_document" "alb_logs" {
+  statement {
+    sid       = "AllowLoadBalancerLogDelivery"
+    effect    = "Allow"
+    actions   = ["s3:PutObject"]
+    resources = [format("arn:%s:s3:::%s/alb/AWSLogs/%s/*", data.aws_partition.current.partition, local.cdn_logs_bucket, data.aws_caller_identity.current.account_id)]
+
+    principals {
+      type        = "Service"
+      identifiers = ["logdelivery.elasticloadbalancing.amazonaws.com"]
+    }
+  }
+}
+
+# The Systems Manager connection moves every Ansible module through a bucket.
+module "ansible_transfer" {
+  source = "../../modules/s3-bucket"
+
+  name = format("%s-ansible-%s", local.prefix, data.aws_caller_identity.current.account_id)
+
+  lifecycle_rules = {
+    expire = {
+      expiration_days                    = 1
+      noncurrent_version_expiration_days = 1
     }
   }
 

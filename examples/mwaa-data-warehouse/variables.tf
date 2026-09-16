@@ -66,6 +66,18 @@ variable "dms_instance_class" {
   default     = "dms.t3.medium"
 }
 
+variable "create_dms_service_roles" {
+  type        = bool
+  description = "Create the account-level service roles DMS needs, such as dms-vpc-role. Turn off in an account where DMS has already been used and they exist."
+  default     = true
+}
+
+variable "create_dms_endpoint_access_role" {
+  type        = bool
+  description = "Create dms-access-for-endpoint, which the Redshift target needs. Turn off in an account where it exists, such as after a Redshift endpoint was made in the console."
+  default     = true
+}
+
 variable "airflow_version" {
   type        = string
   description = "Airflow version for the MWAA environment."
@@ -80,7 +92,7 @@ variable "airflow_environment_class" {
 
 variable "airflow_max_workers" {
   type        = number
-  description = "Ceiling for MWAA worker autoscaling."
+  description = "Ceiling for MWAA worker autoscaling. Ignored for mw1.micro, which runs exactly one worker."
   default     = 5
 }
 

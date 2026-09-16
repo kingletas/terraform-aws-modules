@@ -3,6 +3,7 @@ data "aws_availability_zones" "available" {
 }
 
 data "aws_caller_identity" "current" {}
+data "aws_partition" "current" {}
 
 locals {
   availability_zones = slice(data.aws_availability_zones.available.names, 0, 2)
@@ -22,6 +23,9 @@ module "kms" {
   description = "Warehouse data at rest"
 
   service_principals = [format("logs.%s.amazonaws.com", var.region)]
+
+  # CloudWatch publishes alarms to the encrypted topic and EventBridge sends missed runs to the encrypted queue.
+  delivery_service_principals = ["cloudwatch.amazonaws.com", "events.amazonaws.com"]
 
   tags = local.tags
 }

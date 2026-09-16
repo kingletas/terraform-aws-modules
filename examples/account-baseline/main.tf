@@ -6,6 +6,9 @@ locals {
   account_id = data.aws_caller_identity.current.account_id
   partition  = data.aws_partition.current.partition
 
+  trail_bucket_name = format("%s-cloudtrail-%s", local.prefix, local.account_id)
+  trail_arn         = format("arn:%s:cloudtrail:%s:%s:trail/%s", local.partition, var.region, local.account_id, local.prefix)
+
   tags = {
     Environment = var.environment
     Purpose     = "account-baseline"
@@ -25,6 +28,9 @@ module "kms" {
     "backup.amazonaws.com",
   ]
 
+  # The security topic is encrypted with this key and CloudWatch alarms publish to it.
+  delivery_service_principals = ["cloudwatch.amazonaws.com"]
+
   # Long, because a key deletion here makes seven years of trail unreadable.
   deletion_window_in_days = 30
 
@@ -36,8 +42,9 @@ module "kms" {
 module "trail_bucket" {
   source = "../../modules/s3-bucket"
 
-  name        = format("%s-cloudtrail-%s", local.prefix, local.account_id)
-  kms_key_arn = module.kms.arn
+  name             = local.trail_bucket_name
+  kms_key_arn      = module.kms.arn
+  policy_documents = [data.aws_iam_policy_document.trail_bucket.json]
 
   lifecycle_rules = {
     retain = {
@@ -50,33 +57,13 @@ module "trail_bucket" {
   tags = local.tags
 }
 
-# The s3-bucket module writes a TLS-only policy. CloudTrail also needs explicit
-# permission to write, and the module deliberately does not edit another
-# module's policy, so the whole policy is composed and replaced here.
+# CloudTrail checks the bucket ACL and writes under AWSLogs/<account>/.
 data "aws_iam_policy_document" "trail_bucket" {
-  statement {
-    sid       = "DenyInsecureTransport"
-    effect    = "Deny"
-    actions   = ["s3:*"]
-    resources = [module.trail_bucket.arn, format("%s/*", module.trail_bucket.arn)]
-
-    principals {
-      type        = "*"
-      identifiers = ["*"]
-    }
-
-    condition {
-      test     = "Bool"
-      variable = "aws:SecureTransport"
-      values   = ["false"]
-    }
-  }
-
   statement {
     sid       = "AllowTrailAclCheck"
     effect    = "Allow"
     actions   = ["s3:GetBucketAcl"]
-    resources = [module.trail_bucket.arn]
+    resources = [format("arn:%s:s3:::%s", local.partition, local.trail_bucket_name)]
 
     principals {
       type        = "Service"
@@ -86,7 +73,7 @@ data "aws_iam_policy_document" "trail_bucket" {
     condition {
       test     = "StringEquals"
       variable = "aws:SourceArn"
-      values   = [format("arn:%s:cloudtrail:%s:%s:trail/%s", local.partition, var.region, local.account_id, local.prefix)]
+      values   = [local.trail_arn]
     }
   }
 
@@ -94,7 +81,7 @@ data "aws_iam_policy_document" "trail_bucket" {
     sid       = "AllowTrailWrite"
     effect    = "Allow"
     actions   = ["s3:PutObject"]
-    resources = [format("%s/AWSLogs/%s/*", module.trail_bucket.arn, local.account_id)]
+    resources = [format("arn:%s:s3:::%s/AWSLogs/%s/*", local.partition, local.trail_bucket_name, local.account_id)]
 
     principals {
       type        = "Service"
@@ -107,11 +94,6 @@ data "aws_iam_policy_document" "trail_bucket" {
       values   = ["bucket-owner-full-control"]
     }
   }
-}
-
-resource "aws_s3_bucket_policy" "trail" {
-  bucket = module.trail_bucket.id
-  policy = data.aws_iam_policy_document.trail_bucket.json
 }
 
 # --- the queryable copy ---
@@ -184,7 +166,8 @@ data "aws_iam_policy_document" "trail_role" {
 module "trail" {
   source = "../../modules/cloudtrail-trail"
 
-  name           = local.prefix
+  name = local.prefix
+  # The id output waits for the bucket policy, which CloudTrail checks at creation.
   s3_bucket_name = module.trail_bucket.id
   kms_key_arn    = module.kms.arn
 
@@ -197,6 +180,4 @@ module "trail" {
   insight_types = ["ApiCallRateInsight", "ApiErrorRateInsight"]
 
   tags = local.tags
-
-  depends_on = [aws_s3_bucket_policy.trail]
 }

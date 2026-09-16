@@ -8,6 +8,36 @@ locals {
 
   all_cidrs = concat([var.shared_vpc_cidr], [for name, spoke in var.spokes : spoke.cidr_block])
 
+  # True when at least one spoke has no NAT gateway and so egresses through the hub.
+  egress_through_hub = anytrue([for name, spoke in var.spokes : !spoke.enable_nat_gateway])
+
+  # The spokes table sends unknown traffic to the hub, and drops spoke-to-spoke traffic that would otherwise hairpin through it.
+  transit_static_routes = local.egress_through_hub ? merge(
+    {
+      spokes-default = {
+        route_table_key        = "spokes"
+        destination_cidr_block = "0.0.0.0/0"
+        attachment_key         = "shared"
+        blackhole              = false
+      }
+    },
+    {
+      for name, spoke in var.spokes : format("spokes-isolate-%s", name) => {
+        route_table_key        = "spokes"
+        destination_cidr_block = spoke.cidr_block
+        attachment_key         = null
+        blackhole              = true
+      }
+    }
+  ) : {}
+
+  on_premises_routes = var.on_premises == null ? [] : var.on_premises.routes
+
+  on_premises_route_tables = {
+    hub    = module.transit.route_table_ids["hub"]
+    spokes = module.transit.route_table_ids["spokes"]
+  }
+
   tags = {
     Environment = var.environment
     Network     = var.name
@@ -87,6 +117,8 @@ module "transit" {
     }
   )
 
+  static_routes = local.transit_static_routes
+
   tags = local.tags
 }
 
@@ -110,6 +142,17 @@ resource "aws_route" "shared_to_spokes" {
   depends_on = [module.transit]
 }
 
+# NAT gateway replies to a spoke leave the public subnets, so the public table needs the way back.
+resource "aws_route" "shared_public_to_spokes" {
+  for_each = local.egress_through_hub ? var.spokes : {}
+
+  route_table_id         = module.shared_vpc.public_route_table_id
+  destination_cidr_block = each.value.cidr_block
+  transit_gateway_id     = module.transit.id
+
+  depends_on = [module.transit]
+}
+
 # A spoke sends everything it cannot resolve locally to the hub, which is what
 # gives it internet access through the hub's NAT gateways.
 resource "aws_route" "spoke_default" {
@@ -128,6 +171,44 @@ resource "aws_route" "spoke_default" {
 
   route_table_id         = each.value.route_table_id
   destination_cidr_block = "0.0.0.0/0"
+  transit_gateway_id     = module.transit.id
+
+  depends_on = [module.transit]
+}
+
+# The shared private tables default to the NAT gateways, so on-premises ranges need an explicit route.
+resource "aws_route" "shared_to_on_premises" {
+  for_each = {
+    for pair in setproduct(keys(module.shared_vpc.private_route_table_ids), local.on_premises_routes) :
+    format("%s-%s", pair[0], pair[1]) => {
+      route_table_id = module.shared_vpc.private_route_table_ids[pair[0]]
+      destination    = pair[1]
+    }
+  }
+
+  route_table_id         = each.value.route_table_id
+  destination_cidr_block = each.value.destination
+  transit_gateway_id     = module.transit.id
+
+  depends_on = [module.transit]
+}
+
+# A spoke with its own NAT gateway defaults to it, so on-premises ranges need an explicit route.
+resource "aws_route" "spoke_to_on_premises" {
+  for_each = {
+    for pair in flatten([
+      for name, spoke in var.spokes : [
+        for zone_cidr in setproduct(keys(module.spoke_vpcs[name].private_route_table_ids), local.on_premises_routes) : {
+          key            = format("%s-%s-%s", name, zone_cidr[0], zone_cidr[1])
+          route_table_id = module.spoke_vpcs[name].private_route_table_ids[zone_cidr[0]]
+          destination    = zone_cidr[1]
+        }
+      ] if spoke.enable_nat_gateway
+    ]) : pair.key => pair
+  }
+
+  route_table_id         = each.value.route_table_id
+  destination_cidr_block = each.value.destination
   transit_gateway_id     = module.transit.id
 
   depends_on = [module.transit]
@@ -197,7 +278,14 @@ module "on_premises" {
   transit_gateway_id       = module.transit.id
 
   static_routes_only = var.on_premises.static_routes_only
-  static_routes      = var.on_premises.routes
+  static_routes      = { for cidr in var.on_premises.routes : cidr => cidr }
+
+  # On-premises replies look up the hub table, which has learned the shared VPC and every spoke.
+  transit_gateway_association = { route_table_id = module.transit.route_table_ids["hub"] }
+
+  # The far side's ranges reach both tables, by BGP propagation or by static route.
+  transit_gateway_propagation_route_tables = var.on_premises.static_routes_only ? {} : local.on_premises_route_tables
+  transit_gateway_static_route_tables      = var.on_premises.static_routes_only ? local.on_premises_route_tables : {}
 
   log_group_arn = module.vpn_logs[0].arn
 
