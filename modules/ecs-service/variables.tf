@@ -26,11 +26,15 @@ variable "containers" {
     environment = optional(map(string), {})
     secrets     = optional(map(string), {})
 
-    health_check_command  = optional(list(string))
-    health_check_interval = optional(number, 30)
-    health_check_retries  = optional(number, 3)
+    health_check_command      = optional(list(string))
+    health_check_interval     = optional(number, 30)
+    health_check_retries      = optional(number, 3)
+    health_check_timeout      = optional(number)
+    health_check_start_period = optional(number)
 
     readonly_root_filesystem = optional(bool, true)
+    init_process_enabled     = optional(bool, false)
+    drop_capabilities        = optional(list(string), [])
     user                     = optional(string)
     depends_on_containers    = optional(map(string), {})
   }))
@@ -39,6 +43,24 @@ variable "containers" {
   validation {
     condition     = length(var.containers) > 0
     error_message = "At least one container is required."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for name, container in var.containers : [
+        for capability in container.drop_capabilities : can(regex("^[A-Z_]+$", capability))
+      ]
+    ]))
+    error_message = "Each drop_capabilities entry must be a Linux capability name such as NET_RAW, or ALL."
+  }
+
+  validation {
+    condition = alltrue([
+      for name, container in var.containers :
+      (container.health_check_timeout == null || (container.health_check_timeout >= 2 && container.health_check_timeout <= 60)) &&
+      (container.health_check_start_period == null || (container.health_check_start_period >= 0 && container.health_check_start_period <= 300))
+    ])
+    error_message = "A health_check_timeout must be 2 to 60 seconds, and a health_check_start_period 0 to 300 seconds."
   }
 }
 

@@ -51,9 +51,16 @@ locals {
       ]
 
       healthCheck = container.health_check_command == null ? null : {
-        command  = container.health_check_command
-        interval = container.health_check_interval
-        retries  = container.health_check_retries
+        command     = container.health_check_command
+        interval    = container.health_check_interval
+        retries     = container.health_check_retries
+        timeout     = container.health_check_timeout
+        startPeriod = container.health_check_start_period
+      }
+
+      linuxParameters = !container.init_process_enabled && length(container.drop_capabilities) == 0 ? null : {
+        initProcessEnabled = container.init_process_enabled
+        capabilities       = { drop = container.drop_capabilities }
       }
 
       logConfiguration = {

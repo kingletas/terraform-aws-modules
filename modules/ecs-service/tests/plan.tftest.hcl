@@ -212,3 +212,56 @@ run "refuses_fargate_mixed_with_an_instance_provider" {
 
   expect_failures = [var.capacity]
 }
+
+run "hardens_a_container_and_tunes_its_health_check" {
+  command = plan
+
+  variables {
+    containers = {
+      app = {
+        image                     = "public.ecr.aws/example/app:1.0.0"
+        health_check_command      = ["CMD-SHELL", "exit 0"]
+        health_check_timeout      = 5
+        health_check_start_period = 20
+        init_process_enabled      = true
+        drop_capabilities         = ["ALL"]
+      }
+    }
+  }
+
+  assert {
+    condition     = jsondecode(aws_ecs_task_definition.this.container_definitions)[0].linuxParameters.initProcessEnabled == true
+    error_message = "init_process_enabled must reach the container's linuxParameters."
+  }
+
+  assert {
+    condition     = jsondecode(aws_ecs_task_definition.this.container_definitions)[0].linuxParameters.capabilities.drop == ["ALL"]
+    error_message = "drop_capabilities must reach the container's linuxParameters."
+  }
+
+  assert {
+    condition     = jsondecode(aws_ecs_task_definition.this.container_definitions)[0].healthCheck.startPeriod == 20
+    error_message = "health_check_start_period must reach the container's health check."
+  }
+}
+
+run "leaves_linux_parameters_out_by_default" {
+  command = plan
+
+  assert {
+    condition     = try(jsondecode(aws_ecs_task_definition.this.container_definitions)[0].linuxParameters, null) == null
+    error_message = "A container that asks for nothing must not get linuxParameters."
+  }
+}
+
+run "refuses_a_malformed_capability" {
+  command = plan
+
+  variables {
+    containers = {
+      app = { image = "public.ecr.aws/example/app:1.0.0", drop_capabilities = ["net raw"] }
+    }
+  }
+
+  expect_failures = [var.containers]
+}

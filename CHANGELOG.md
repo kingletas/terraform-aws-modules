@@ -6,6 +6,10 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **`ecs-service`**: per-container `init_process_enabled` and `drop_capabilities`, so a container can run an init process and drop Linux capabilities such as `ALL`, and `health_check_timeout` and `health_check_start_period` for the container health check. Containers that set none of them are unchanged.
+
 ## [0.4.0] - 2026-09-16
 
 ### Added
