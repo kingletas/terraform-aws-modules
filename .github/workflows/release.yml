@@ -16,13 +16,60 @@ permissions:
   contents: read
 
 jobs:
+  # The gate already runs on every push to main, so a tag on a commit main has
+  # proved would run it a second time over an identical tree. Asked rather than
+  # assumed: only a completed, successful CI run for this exact commit skips it.
+  # A run still going, a failed lookup and a tag on an unproved commit all mean
+  # run the gate, because the cheap answer must never be the one that skips it.
+  proved:
+    name: Has this commit already passed
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    outputs:
+      already: ${{ steps.look.outputs.already }}
+    steps:
+      - name: Look for a successful CI run on this commit
+        id: look
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          # A lookup that fails must read as "not proved". `|| true` and the
+          # digits test are what keep an error from being taken for a pass.
+          count="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${SHA}&status=completed" \
+            --jq '[.workflow_runs[] | select(.path == ".github/workflows/ci.yml" and .conclusion == "success")] | length' \
+            2>/dev/null || true)"
+          case "$count" in
+            '' | *[!0-9]*) count=0 ;;
+          esac
+
+          if [ "$count" -gt 0 ]; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "CI has already passed on ${SHA}. Not running it again."
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+            echo "No completed, successful CI run for ${SHA}. Running the gate."
+          fi
+
   # A release nobody proved is a release nobody should trust, so the tagged commit
   # passes the same gate every push does before anything is published.
   check:
+    needs: proved
+    if: needs.proved.outputs.already != 'true'
     uses: ./.github/workflows/ci.yml
 
   release:
-    needs: check
+    needs: [proved, check]
+    # `always()` is needed only because a skipped dependency would otherwise
+    # skip this too. The conditions are written as what must be true rather than
+    # what must not, so a state nobody thought of stops the release.
+    if: >-
+      always() &&
+      needs.proved.result == 'success' &&
+      (needs.check.result == 'success' || needs.check.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: write

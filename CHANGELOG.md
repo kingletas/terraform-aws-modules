@@ -6,6 +6,10 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The release workflow ran the full gate a second time over a tree the push to `main` had already proved. It now asks whether a completed, successful CI run exists for that exact commit and skips the duplicate only then. A run still in progress, a tag on an unproved commit and a failed lookup all still run the gate, because the cheap answer must never be the one that skips it.
+
 ### Fixed
 
 - `packaging/release-notes.sh` put the changelog's trailing link definitions into the notes of whichever version is listed last. That version is the oldest one, so the defect only ever showed on a backfill, which is when it showed. A definition inside a section, with content after it, still survives.
