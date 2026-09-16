@@ -71,7 +71,7 @@ jobs:
             "https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz"
           tar -xzf /tmp/conftest.tar.gz -C /usr/local/bin conftest
 
-      # The same entry point a developer runs, so CI and a laptop cannot disagree.
+      # Runs the same make target as a local check, so the two cannot disagree.
       - name: make check
         env:
           GITHUB_TOKEN: ${{ github.token }}

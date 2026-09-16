@@ -23,8 +23,8 @@ sort:
 
 settings:
   anchor: false
-  # Document the constraint a caller must satisfy, not whatever happens to be
-  # locked on the machine that ran it, which differs between laptop and CI.
+  # Documents the provider constraint a caller must satisfy, not the versions
+  # in the lock file where the docs were generated.
   lockfile: false
   default: true
   escape: true

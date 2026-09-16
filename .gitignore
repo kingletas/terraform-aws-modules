@@ -1,7 +1,7 @@
 # Terraform state and working directories
 .terraform/
-# A child module must not pin its consumer's providers. Examples are root
-# modules and commit theirs.
+# Lock files in modules. A module leaves provider selection to its caller;
+# examples commit theirs.
 modules/*/.terraform.lock.hcl
 .terraform.tfstate.lock.info
 *.tfstate
@@ -9,7 +9,7 @@ modules/*/.terraform.lock.hcl
 crash.log
 crash.*.log
 
-# Variable files, which carry real values
+# Variable files, which carry real values; the committed examples end in .example
 *.tfvars
 *.tfvars.json
 !*.tfvars.example
@@ -20,7 +20,7 @@ crash.*.log
 plan.json
 plan.out
 
-# Backend configuration pointing at real accounts
+# Backend configuration for a real account; backend.tf.example is kept
 backend.tf
 !backend.tf.example
 
@@ -34,9 +34,8 @@ backend.tf
 *.gpg
 pki/
 
-# Local scratch, ignored globally too
+# Local scratch output
 local.d/
-
 
 # Editor and OS
 .idea/
@@ -44,7 +43,5 @@ local.d/
 *.swp
 .DS_Store
 
-# The user-level ~/.gitignore is core.excludesFile for every repository under
-# $HOME and excludes *.sh outright. Without this negation the release workflow
-# fails on a script that was never pushed.
+# Shell scripts are always tracked, even where a global excludes file ignores them
 !*.sh

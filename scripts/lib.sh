@@ -37,13 +37,13 @@ require_tool() {
   want="$(pinned_version "$name")"
 
   if ! command -v "$command" >/dev/null 2>&1; then
-    bad "$name is not installed — this lane did not run (this repository expects $want)"
+    bad "$name is not installed; this lane did not run (this repository expects $want)"
     return 127
   fi
 
   got="$("$command" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
   if [[ -z "$got" ]]; then
-    bad "$name on PATH is a placeholder, not the real tool — this lane did not run"
+    bad "$name on PATH is a placeholder, not the real tool; this lane did not run"
     return 127
   fi
 

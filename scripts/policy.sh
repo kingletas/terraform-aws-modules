@@ -55,8 +55,8 @@ fi
 # one breaks exactly one convention, so exactly one finding is the pass.
 #
 # Fixtures are stored as *.tf.fixture and take the .tf name only here. They are
-# deliberately broken Terraform, and under a .tf name every infrastructure
-# scanner in the estate reports them as real findings on every commit.
+# deliberately broken Terraform, and under a .tf name trivy and tflint report
+# them as real findings.
 
 staging="$(mktemp -d)"
 trap 'rm -rf "$staging"' EXIT

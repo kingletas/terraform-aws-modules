@@ -1,47 +1,43 @@
 # Policy
 
-The conventions in [CONTRIBUTING.md](../CONTRIBUTING.md), as rules a machine decides. Run with `make policy`, and as a lane of `make check`.
+The conventions in [CONTRIBUTING.md](../CONTRIBUTING.md) that a machine can decide, written as [conftest](https://www.conftest.dev/) rules in `conventions.rego`. They run with `make policy`, and as one lane of `make check`.
 
 ```bash
 make policy
 ```
 
-## What this decides, and what checkov and tflint already decide
+## What the rules check
 
-checkov and tflint judge **the infrastructure these modules build**: whether a bucket is public, whether a volume is encrypted, whether a variable has a description. Both do that well and neither is repeated here.
+checkov and tflint judge the infrastructure the modules build: whether a bucket is public, whether a volume is encrypted, whether a variable has a description. These rules judge the module code itself, and none of them repeats a checkov or tflint check.
 
-These rules judge **the code**. They are the conventions that make a module composable and a plan stable, every one of which could previously be broken with a green build:
-
-| Rule | What it costs when it is broken |
+| Rule | What goes wrong when it is broken |
 |---|---|
 | A module carries no `provider` block | A module with its own provider cannot be used twice in one configuration |
-| Every required provider states a version | The build floats, and two checkouts resolve differently |
-| A module states a range, not a pin | A library that pins decides for every caller, and two pinned modules cannot be composed |
+| Every required provider states a version | The provider version floats, and two checkouts resolve differently |
+| A module states a range, not a pin | A module that pins decides for every caller, and two pinned modules cannot be composed |
 | `count` is not set to a length | `count` renumbers every element after a removal, so deleting one rebuilds the rest |
 | Existence is not decided by a null string | Terraform cannot know a value from another resource is non-null until apply, so the plan fails exactly when the value comes from the same plan |
-| A credential-shaped string is `sensitive` | An unmarked value is printed in plan output and in CI logs |
-| Every module has `versions.tf`, `variables.tf`, `outputs.tf` | A reader has to search for what should be in the same three places every time |
+| A credential-shaped string variable is `sensitive` | An unmarked value is printed in plan output and in CI logs |
+| Every module has `versions.tf`, `variables.tf` and `outputs.tf` | A reader has to search for what should always be in the same three places |
 
-## Every rule is proved to still refuse
+The provider-block, range and three-files rules apply only under `modules/`. The other rules apply to examples too.
 
-`tests/fixture` holds one small module per rule, each breaking exactly one convention. `make policy` runs the repository first, which must be silent, then every fixture, each of which must produce **exactly one** finding, and that finding must be the right one.
+## How each rule is tested
 
-That second half is the point. A rule that has never been watched refuse decides nothing, and a rule that quietly stops matching looks identical to a repository that is clean. Both halves run every time.
+`tests/fixture` holds one small module per rule, each breaking exactly one convention, with an `EXPECT` file naming the finding it must produce. `make policy` checks the repository first, which must produce no findings, then each fixture, which must produce exactly one finding, and the one named in `EXPECT`. A rule that stops matching fails the lane instead of passing silently.
 
-A fixture is copied under `modules/` before it is checked, because several rules key on that prefix, and a fixture checked anywhere else would prove nothing.
+Each fixture is copied under a `modules/` path before it is checked, because several rules only apply there.
 
-**Fixtures are stored as `*.tf.fixture` and take the `.tf` name only inside that copy.** They are deliberately broken Terraform, and under a real `.tf` name every infrastructure scanner treats them as real findings: `trivy` refused a commit over an unencrypted bucket in a fixture whose entire job was to omit `outputs.tf`. conftest is told its parser explicitly, so the extension costs it nothing. The alternative was a path exclusion in each scanner, which means a new exclusion every time a scanner is added and a fixture that is one forgotten config line away from failing every commit.
+Fixture files are stored as `*.tf.fixture` and renamed to `.tf` only inside that temporary copy. They are deliberately broken Terraform, and under a `.tf` name scanners such as tflint and trivy would report them as real findings.
 
-## What this deliberately does not decide
+## What is left to review
 
-**`toset()` in a `for_each`.** `CONTRIBUTING.md` warns that `toset(var.subnet_ids)` fails the first plan of any stack that creates its own subnets, because the keys of the set *are* the values and they do not exist until apply. That is true and it matters.
-
-It is not a rule here, because `toset()` appears eleven times in this repository and most of them are fine: service names, availability zones and account IDs are all known at plan. Nothing in the source says which values arrive from another resource. A rule that fired on all eleven would be wrong nine times, and a check that is wrong most of the time is one people learn to scroll past. It stays in review, named rather than implied.
-
-**Whether a module is used anywhere.** A module with no example and no test of its own is a real gap, and it is a question about the whole tree rather than about any file. `make plan-test` already fails when a module has neither.
+`toset()` in a `for_each` is not a rule. It fails a first plan only when the set's values come from resources created in the same plan, and nothing in the source says where a value comes from. Reviewers check it against the convention in CONTRIBUTING.md.
 
 ## Adding a rule
 
-Write the rule in `conventions.rego`, then write the fixture that proves it refuses, then run `make policy`. **A rule without a fixture is not finished**, and the runner will not tell you so, because it only checks the fixtures that exist.
+1. Write the rule in `conventions.rego`.
+2. Add a fixture directory under `tests/fixture/` that breaks only that convention, with its `*.tf.fixture` files and an `EXPECT` file holding a line from the expected message.
+3. Run `make policy`. The repository must stay clean and the new fixture must be refused for the right reason.
 
-Check the rule against the whole repository before committing it. The first draft of these seven produced 34 findings and every one was a false positive: `length(x) > 0 ? 1 : 0` read as a collection keyed by position, and `manage_master_password`, a bool, read as a credential. A rule that fires when nothing is wrong is worse than no rule, because it teaches you to ignore the lane.
+Check the rule against the whole repository before committing it. A rule that fires on correct code teaches people to ignore the lane.

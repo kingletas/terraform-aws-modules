@@ -16,10 +16,10 @@ failed=0
 for dir in "${targets[@]}"; do
   name="${dir#"$ROOT_DIR"/}"
   name="${name%/}"
-  [[ -f "$dir/tests/plan.tftest.hcl" ]] || { bad "$name — has no plan test"; failed=$((failed + 1)); continue; }
+  [[ -f "$dir/tests/plan.tftest.hcl" ]] || { bad "$name: has no plan test"; failed=$((failed + 1)); continue; }
 
   if ! "$TERRAFORM" -chdir="$dir" init -backend=false -input=false -no-color >/dev/null; then
-    bad "$name — init failed"
+    bad "$name: init failed"
     failed=$((failed + 1))
     continue
   fi

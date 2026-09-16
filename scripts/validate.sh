@@ -9,7 +9,7 @@ failed=0
 for dir in $(terraform_dirs); do
   name="${dir#"$ROOT_DIR"/}"
   if ! "$TERRAFORM" -chdir="$dir" init -backend=false -input=false -no-color >/dev/null; then
-    bad "$name — init failed"
+    bad "$name: init failed"
     failed=$((failed + 1))
     continue
   fi

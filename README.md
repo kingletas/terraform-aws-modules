@@ -1,11 +1,23 @@
 # Terraform modules for AWS
 
-[![CI](https://github.com/kingletas/terraform-aws-modules/actions/workflows/ci.yml/badge.svg)](https://github.com/kingletas/terraform-aws-modules/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Fifty-nine reusable Terraform modules for AWS, drawn from infrastructure I've actually run: multi-account, networking, compute, data, storage, messaging, edge, identity and operations.
+Fifty-nine reusable Terraform modules for AWS, covering multi-account setup, networking, compute, data, storage, messaging, edge, identity and operations, and eleven examples that compose them into complete stacks.
 
-Each module does one thing, and you compose them. Every input is typed, described and validated where it can be, and every collection is keyed by a name you choose rather than by list position. The `examples/` directory holds working compositions you can apply as they are.
+Each module does one thing, and you compose them. Every input is typed, described and validated where it can be, and every collection is keyed by a name you choose rather than by list position.
+
+New here? [From nothing to a planned stack](docs/from-nothing.md) takes you from a clone to a planned example, without an AWS account, in about ten minutes.
+
+## Contents
+
+- [What's here](#whats-here)
+- [Using a module](#using-a-module)
+- [Versioning and pinning](#versioning-and-pinning)
+- [Requirements](#requirements)
+- [Conventions](#conventions)
+- [Testing](#testing)
+- [Working on this repository](#working-on-this-repository)
+- [License](#license)
 
 ## What's here
 
@@ -36,7 +48,7 @@ Each module does one thing, and you compose them. Every input is typed, describe
 | [`instance-fleet`](modules/instance-fleet) | EC2 instances in named roles, each a variation on one base spec |
 | [`ssh-key-pair`](modules/ssh-key-pair) | A key pair, supplied or generated, private half in Secrets Manager |
 | **Load balancing** | |
-| [`alb`](modules/alb) | Target groups, an HTTPS listener, and HTTP answering with a redirect |
+| [`alb`](modules/alb) | Target groups, an HTTPS listener with host, path and header rules, and HTTP answering with a redirect |
 | [`nlb`](modules/nlb) | TCP and TLS listeners for what an ALB can't carry |
 | **Data** | |
 | [`rds-instance`](modules/rds-instance) | A managed database whose password AWS holds, not Terraform |
@@ -76,36 +88,38 @@ Each module does one thing, and you compose them. Every input is typed, describe
 | **Operations** | |
 | [`ansible-inventory`](modules/ansible-inventory) | The Terraform-to-Ansible handoff: inventory, facts and ssh config |
 | [`cloudwatch-alarm`](modules/cloudwatch-alarm) | Alarms as a set, including metric maths |
-| [`cloudwatch-dashboard`](modules/cloudwatch-dashboard) | A dashboard that lays its own widgets out |
+| [`cloudwatch-dashboard`](modules/cloudwatch-dashboard) | A dashboard built from typed widgets, with a console link |
 | [`cloudwatch-log-group`](modules/cloudwatch-log-group) | Retention, metric filters and subscriptions |
 | [`cloudwatch-metric-stream`](modules/cloudwatch-metric-stream) | Metrics pushed to a delivery stream instead of polled for |
 | [`backup-plan`](modules/backup-plan) | A vault and plan, selecting resources by tag |
 | [`cloudtrail-trail`](modules/cloudtrail-trail) | A multi-region trail with log file validation |
-| [`transfer-server`](modules/transfer-server) | Managed SFTP over S3, each user confined to its prefix |
+| [`transfer-server`](modules/transfer-server) | Managed SFTP over S3, each user confined to its home directory |
 
 | Example | What it shows |
 |---|---|
-| [`magento`](examples/magento) | **Adobe Commerce, end to end**: CloudFront and WAF at the edge, an autoscaling web tier, the two nodes Magento can't replicate, Aurora, Valkey, OpenSearch and EFS, and configuration discovered by tag rather than written down |
-| [`container-platform`](examples/container-platform) | **ECR and ECS Fargate**: a repository, service and target group per service, immutable tags, spot with an on-demand floor |
+| [`magento`](examples/magento) | **Adobe Commerce, end to end**: CloudFront and WAF at the edge, an autoscaling web tier, single nodes for cron and the admin panel, Aurora, Valkey, OpenSearch and EFS, and configuration discovered by tag rather than written down |
+| [`container-platform`](examples/container-platform) | **ECR and ECS Fargate**: a repository, service and target group per service, Fargate Spot above an on-demand task, immutable tags, path-based routing behind one load balancer |
 | [`serverless-api`](examples/serverless-api) | **API Gateway, Lambda, DynamoDB, SQS**: accept fast, process behind a queue |
-| [`static-site-cdn`](examples/static-site-cdn) | **S3 and CloudFront**: origin access control, WAF, and the three things that must live in us-east-1 |
+| [`static-site-cdn`](examples/static-site-cdn) | **S3 and CloudFront**: origin access control, WAF, and the resources CloudFront needs in us-east-1 |
 | [`network-hub`](examples/network-hub) | **Transit gateway**: hub and spokes, centralised NAT, optional site-to-site VPN |
 | [`mwaa-data-warehouse`](examples/mwaa-data-warehouse) | **Airflow, DMS and Redshift**: replication from source systems into a warehouse, every credential in Secrets Manager |
 | [`data-pipeline`](examples/data-pipeline) | **Step Functions batch load**: raw and curated zones, a run ledger, and alarms that tell "nothing to do" from "didn't run" |
-| [`partner-sftp-exchange`](examples/partner-sftp-exchange) | **Transfer Family**: partners confined to their own prefix, seven years of transfer logs |
+| [`partner-sftp-exchange`](examples/partner-sftp-exchange) | **Transfer Family**: partners confined to their own prefix, seven years of transfer logs, alarms on failed partner logins |
 | [`account-baseline`](examples/account-baseline) | **CloudTrail and alarms**: root use, sign-in without MFA, trail tampering, backups by tag |
 | [`client-vpn-cert-auth`](examples/client-vpn-cert-auth) | A VPN into a private VPC, authenticated by a certificate authority you run yourself |
 | [`ec2-in-vpc`](examples/ec2-in-vpc) | Instances reachable through Session Manager, with no SSH key and nothing open inbound |
 
-**The examples are the point.** Each one is a working composition with a README that says what it costs, which decisions are deliberate, and what it doesn't do. They carry the operational detail a module can't: why Magento gets exactly one cron node, why an SQS visibility timeout is six times the function timeout, why a spoke VPC has no NAT gateway of its own.
+Each example is a working composition with a README that covers what it builds, what must exist before you deploy it, what it costs, and its limits. The examples carry the operational detail a module cannot: why Magento gets exactly one cron node, why an SQS visibility timeout is six times the function timeout, why a spoke VPC has no NAT gateway of its own.
+
+The examples call modules with relative paths (`../../modules/<name>`) so they always use the code beside them. If you copy an example into your own repository, change each `source` to the Git form shown below.
 
 ## Using a module
 
-Point `source` at this repository and pin a tag. Without `ref`, `terraform init` takes whatever is on the default branch that day.
+Point `source` at a module in this repository and pin a release with `?ref=`:
 
 ```hcl
 module "vpc" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/vpc?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/vpc?ref=v0.3.0"
 
   name               = "platform"
   cidr_block         = "10.0.0.0/16"
@@ -117,9 +131,27 @@ module "vpc" {
 }
 ```
 
-**While this repository is private, fetch it over SSH**: `git::ssh://git@github.com/kingletas/terraform-aws-modules.git//modules/vpc?ref=v0.1.0`. The shorter form above fails on authentication until then. [From nothing to a planned stack](docs/from-nothing.md) walks through both.
+Then run `terraform init` to fetch it. Each module's README lists every input and output, with a usage example. Required inputs have no default; everything else has a safe one.
 
-Or copy a module into your own repository. None of them depends on another module or on anything else here.
+No module depends on another module in this repository, so you can also copy a single module directory into your own codebase.
+
+## Versioning and pinning
+
+Releases are tagged `vMAJOR.MINOR.PATCH` and follow [semantic versioning](https://semver.org/). Before 1.0, a minor release (for example `v0.3.0` to `v0.4.0`) may change module interfaces or behaviour. A patch release does not. [CHANGELOG.md](CHANGELOG.md) lists every breaking change with what a caller has to do, so read it before you move to a new minor version.
+
+Always pin a `ref`. Without one, `terraform init` takes whatever is on the default branch at the time.
+
+A tag is the readable choice. A commit SHA is the stronger one, because a tag can be moved and a commit cannot. Pin the SHA and keep the tag in a comment so readers and update tools know which release it is:
+
+```hcl
+module "vpc" {
+  source = "github.com/kingletas/terraform-aws-modules//modules/vpc?ref=<commit-sha>" # v0.3.0
+
+  # ...
+}
+```
+
+Replace `<commit-sha>` with the full 40-character commit SHA. `git ls-remote --tags https://github.com/kingletas/terraform-aws-modules.git` lists it on the line ending `refs/tags/v0.3.0^{}`, which is the commit the tag points to.
 
 ## Requirements
 
@@ -128,99 +160,86 @@ Or copy a module into your own repository. None of them depends on another modul
 | Terraform | >= 1.9 |
 | AWS provider | >= 6.0, < 7.0 |
 
-Modules declare a wide range so they fit whatever you already run. The examples pin exactly and commit a lock file. A library says what it tolerates; a deployment says what it was tested against.
+`dynamodb-table` needs AWS provider 6.37.0 or later. A few modules also need the `random`, `tls` or `local` provider; each module's README lists its providers.
+
+Modules declare a version range so they fit the provider version you already run. The examples declare a range too (`~> 6.0`) and commit a `.terraform.lock.hcl`, which records the exact provider version and checksums they were tested with.
 
 ## Conventions
 
 These hold across every module, so the next one you pick up behaves like the last.
 
 - **Every input has a type and a description**, and anything that can be validated at plan time is. A bad CIDR fails before it reaches AWS.
-- **Collections are keyed by a name you choose**, never by list position. Removing the second of three rules doesn't renumber the third.
+- **Collections are keyed by a name you choose**, never by list position. Removing the second of three rules does not renumber the third.
 - **Outputs are maps keyed the same way** as the inputs that produced them.
-- **No provider blocks inside a module.** Modules declare what they need, and you configure it. A module with its own provider can't be used twice in one configuration.
-- **No secrets on disk.** Nothing reads a certificate or key from a path baked into the module. Sensitive values arrive as marked variables.
-- **Secure by default, with a way out.** Encryption on, public IPs off, IMDSv2 required, logging on. Each is a variable, so you can choose otherwise on purpose.
+- **No provider blocks inside a module.** Modules declare what they need, and you configure it. A module with its own provider cannot be used twice in one configuration.
+- **No secrets on disk.** Nothing reads a certificate or key from a path baked into the module. Sensitive values arrive as variables marked `sensitive`.
+- **Secure by default, with a way out.** Encryption on, public addresses off, IMDSv2 required, logging on. Each is a variable, so you can choose otherwise on purpose.
 
-## Working on this
+## Testing
+
+Every module is planned by `terraform test` against [mock providers](testing/mocks): stand-ins for AWS that need no credentials and create nothing. A module is planned either through an example that composes it or by a test of its own in `modules/<name>/tests/`. Planning with real values catches errors `terraform validate` cannot see, because `validate` treats every variable as unknown: a `for_each` keyed on a value that only exists after apply, or a provider argument AWS would reject.
+
+The tests assert on the planned values, and include refusal tests: runs that set invalid inputs and expect a named validation or precondition to stop the plan.
+
+To run one module's or one example's tests:
+
+```bash
+terraform -chdir=modules/vpc init -backend=false && terraform -chdir=modules/vpc test
+```
+
+`make check` runs everything a change has to pass:
+
+| Lane | Tool | What it checks |
+|---|---|---|
+| format | `terraform fmt` | Canonical formatting |
+| validate | `terraform validate` | Every module and example initialises and type-checks |
+| plan | `terraform test` | Every example and module test plans against mock providers |
+| lint | [tflint](https://github.com/terraform-linters/tflint) with the AWS ruleset | Naming, typed and documented variables and outputs, provider rules |
+| security | [checkov](https://www.checkov.io/) | Security misconfiguration in the resources |
+| policy | [conftest](https://www.conftest.dev/) | This repository's own conventions; see [`policy/`](policy) |
+| docs | [terraform-docs](https://terraform-docs.io/) | Every module README's tables match its variables and outputs |
+
+The tests do not create resources in AWS. Before you rely on a module in production, apply it in an account where a mistake is cheap, and read its README for prerequisites such as account-level roles or settings.
+
+### Scanner exceptions
+
+A checkov check that cannot apply to a reusable module is skipped with a reason, either inline on the resource as a `# checkov:skip=` comment or for the whole repository in [`.checkov.yml`](.checkov.yml). Most repository-wide skips are checks that depend on a value the caller passes, or on the stack around the module, such as whether a load balancer sits behind a WAF. Run checkov over the configuration that deploys these modules, where those questions can be answered.
+
+If you scan with trivy, three findings carry an inline `trivy:ignore` with the reason: all outbound traffic by default in `security-group`, a load balancer that can be public, and a port 80 listener that redirects to HTTPS.
+
+## Working on this repository
 
 ```bash
 make help
 ```
 
-```bash
-make check
-```
-
-`make check` runs seven lanes: formatting, validation, the plan tests, tflint, checkov, the policy rules in [`policy/`](policy), and a check that every module README matches its code. Each tool's version is pinned in `.tool-versions`. **If a tool is missing or the wrong version, the lane says so and fails.** It never counts as a pass, because a green run that quietly skipped half its checks is worse than a red one.
-
 | Target | What it does |
 |---|---|
+| `make check` | Run every lane above; a lane whose tool is missing or the wrong version fails |
 | `make fmt` | Rewrite every file to canonical formatting |
+| `make fmt-check` | Fail if any file is not canonically formatted |
 | `make validate` | Initialise and validate every module and example |
-| `make plan-test` | Plan every example, and every module no example uses, against mock providers |
-| `make lint` | Run tflint |
-| `make security` | Run checkov |
-| `make policy` | Check this repository's own conventions, and that each rule still refuses |
+| `make plan-test` | Plan every example, and every module with its own test, against mock providers |
+| `make lint` | Run tflint over every module and example |
+| `make security` | Run checkov over the repository |
+| `make policy` | Check this repository's conventions, and that each rule still refuses the case it exists for |
 | `make docs` | Regenerate the input and output tables in each module README |
+| `make docs-check` | Fail if a module README's tables are out of date |
 | `make clean` | Remove `.terraform` directories and the modules' lock files |
 
-The input and output tables in each module README are generated between the `BEGIN_TF_DOCS` and `END_TF_DOCS` markers. Don't edit them by hand: change the variable, then run `make docs`.
-
-### Tools
+The tool versions are pinned in [`.tool-versions`](.tool-versions):
 
 | Tool | Needed for |
 |---|---|
-| [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.9 | everything |
-| [checkov](https://www.checkov.io/) | `make security` |
+| [Terraform](https://developer.hashicorp.com/terraform/install) | everything |
 | [tflint](https://github.com/terraform-linters/tflint) | `make lint` |
-| [terraform-docs](https://terraform-docs.io/) | `make docs` |
+| [checkov](https://www.checkov.io/) | `make security` |
 | [conftest](https://www.conftest.dev/) | `make policy` |
+| [terraform-docs](https://terraform-docs.io/) | `make docs`, `make docs-check` |
 
-## A note on checkov
+The input and output tables in each module README are generated between the `BEGIN_TF_DOCS` and `END_TF_DOCS` markers. Do not edit them by hand: change the variable or output, then run `make docs`.
 
-The scan reports **1,184 passed, 0 failed and 15 skipped**. A check that can't pass is skipped with a reason, either on the resource it concerns as a `# checkov:skip=` comment, or in `.checkov.yml`, which turns it off for the whole repository. Every entry carries a comment. The reasons fall into four groups, and they're worth reading rather than trusting:
-
-- **The caller decides, and checkov can't see across a module boundary.** Each of these is a variable on the module — access logging, enhanced monitoring, a customer-managed key. Checkov reads the declaration, not the value you pass, so it treats every one as unset.
-- **A deployment concern no single module can satisfy.** Whether a volume is in a backup plan, or a load balancer sits behind a WAF, is true of a stack rather than of a resource. Answering it would mean one module reaching into another.
-- **Checkov is wrong about the design.** It flags the ALB's plain HTTP listener for not using TLS 1.2, when that listener only exists to answer port 80 with a redirect. It flags `resources = ["*"]` in a KMS key policy, where it's required and means *this key*.
-- **A real gap, named rather than hidden.** CloudFront origin failover isn't implemented yet. It's skipped on the distribution with a comment calling it a gap, so nobody mistakes it for a decision.
-
-A check that can never pass stops being a check; people learn to scroll past it. **A repository that deploys these modules should run checkov with none of these skips**, because that's where they can be answered.
-
-If you scan with trivy, three of its findings are deliberate and carry an inline `trivy:ignore` with the reason: all outbound traffic by default in `security-group`, a load balancer that can be public, and a port 80 listener that redirects once a certificate is set.
-
-## What's been verified
-
-Every module and example is checked statically, and every module is planned against mock providers, either through an example that uses it or through a test of its own. Nothing has been applied.
-
-| Check | What it proves |
-|---|---|
-| `terraform fmt -check -recursive` | formatting |
-| `terraform validate` | every module and example parses and type-checks with its variables unknown |
-| **`terraform test` with mock providers** | **every module plans with real values**, including IDs that don't exist until apply — see below |
-| `tflint` with the AWS ruleset | clean |
-| `checkov` | clean, with each skip explained in `.checkov.yml` or on the resource |
-| **`conftest`** | **the conventions in `CONTRIBUTING.md` hold**, and every rule is watched refusing a fixture built to break it. See [`policy/`](policy) |
-| `terraform-docs --output-check` | every module README current |
-| Applied against AWS or an emulator | **no** |
-
-### Why the plan tests exist
-
-`terraform validate` runs with every variable unknown, so it can't see an expression that only fails once real values arrive. The plan tests evaluate every example with invented but realistic values, against [mock providers](testing/mocks) that stand in for AWS. They need no credentials and create nothing.
-
-They earned their place on their first run. Every module passed validation, and planning still found errors that would have broken a real first `terraform plan`:
-
-- **Unknown `for_each` keys.** A collection keyed by values that don't exist until apply — a load balancer ARN, a subnet ID — can't be planned. Every collection that becomes resources is now a map with static keys.
-- **`count` on whether a computed value is null.** Terraform can't tell that an unknown string isn't null until apply. Modules now decide whether a resource exists with a bool or an object, never a nullable string.
-- **Conditionals between differently shaped objects**, which fail to evaluate or silently turn numbers into strings.
-- **`coalesce(x, "")`**, which errors when `x` is null because `coalesce` skips empty strings.
-- **Values the provider rejects** — a security policy name that didn't exist, and a log retention CloudWatch doesn't accept.
-
-**A module you haven't planned is unproven.** Run `make plan-test` after changing one.
-
-### What cannot be tested locally
-
-**About twenty modules can't run against a local AWS emulator at all**, because the emulator doesn't implement the service: RDS and Aurora, OpenSearch, ElastiCache, DocumentDB, Redshift, MWAA, DMS, Transfer Family, CloudFront, WAF, Cognito, Transit Gateway, Client VPN, Backup and CloudTrail. They're planned and statically checked, and that's all.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for adding a module, and [SECURITY.md](SECURITY.md) for reporting a vulnerability.
 
 ## License
 

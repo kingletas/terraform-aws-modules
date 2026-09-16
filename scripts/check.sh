@@ -41,7 +41,7 @@ if [[ ${#failed[@]} -gt 0 ]]; then
 fi
 
 if [[ ${#unrun[@]} -gt 0 ]]; then
-  bad "some lanes could not run — this is not a pass"
+  bad "some lanes could not run; this is not a pass"
   exit 2
 fi
 
