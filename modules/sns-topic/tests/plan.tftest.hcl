@@ -30,23 +30,32 @@ run "lets_services_publish_from_this_account" {
   }
 
   assert {
-    condition     = one(data.aws_iam_policy_document.this[0].statement).actions == toset(["sns:Publish"])
+    condition     = [for statement in data.aws_iam_policy_document.this[0].statement : statement.sid] == ["AllowServicePublishBySourceAccount", "AllowServicePublishBySourceOwner"]
+    error_message = "The service grant must have one statement per source account key."
+  }
+
+  assert {
+    condition     = alltrue([for statement in data.aws_iam_policy_document.this[0].statement : statement.actions == toset(["sns:Publish"])])
     error_message = "The service grant must allow publishing and nothing else."
   }
 
   assert {
-    condition     = toset(one(one(data.aws_iam_policy_document.this[0].statement).principals).identifiers) == toset(["cloudwatch.amazonaws.com", "backup.amazonaws.com"])
-    error_message = "The service grant must name exactly the publishing services."
+    condition = alltrue([
+      for statement in data.aws_iam_policy_document.this[0].statement :
+      toset(one(statement.principals).identifiers) == toset(["cloudwatch.amazonaws.com", "backup.amazonaws.com"])
+    ])
+    error_message = "Both statements must name exactly the publishing services, so each service is granted under either key."
   }
 
   assert {
-    condition     = toset(one([for condition in one(data.aws_iam_policy_document.this[0].statement).condition : condition.values if condition.variable == "aws:SourceAccount"])) == toset(["123456789012"])
-    error_message = "The service grant must be limited to this account."
-  }
-
-  assert {
-    condition     = length([for condition in one(data.aws_iam_policy_document.this[0].statement).condition : condition if condition.variable == "aws:SourceArn"]) == 0
-    error_message = "With no source ARNs, the grant must not add an aws:SourceArn condition."
+    condition = jsonencode([
+      for statement in data.aws_iam_policy_document.this[0].statement :
+      [for condition in statement.condition : [condition.test, condition.variable, tolist(condition.values)]]
+      ]) == jsonencode([
+      [["StringEquals", "aws:SourceAccount", ["123456789012"]]],
+      [["StringEquals", "aws:SourceOwner", ["123456789012"]]],
+    ])
+    error_message = "Each statement must require this account under its own key and add no other condition."
   }
 }
 
@@ -59,8 +68,11 @@ run "limits_services_to_source_arns" {
   }
 
   assert {
-    condition     = toset(one([for condition in one(data.aws_iam_policy_document.this[0].statement).condition : condition.values if condition.variable == "aws:SourceArn" && condition.test == "ArnLike"])) == toset(["arn:aws:events:us-east-1:123456789012:rule/plan-test"])
-    error_message = "Source ARNs must limit the grant by aws:SourceArn."
+    condition = alltrue([
+      for statement in data.aws_iam_policy_document.this[0].statement :
+      toset(one([for condition in statement.condition : condition.values if condition.variable == "aws:SourceArn" && condition.test == "ArnLike"])) == toset(["arn:aws:events:us-east-1:123456789012:rule/plan-test"])
+    ])
+    error_message = "Source ARNs must limit both statements by aws:SourceArn."
   }
 }
 

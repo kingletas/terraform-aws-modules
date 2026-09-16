@@ -65,7 +65,7 @@ variable "policy_json" {
 
 variable "publishing_services" {
   type        = list(string)
-  description = "Service principals allowed to publish to the topic, such as cloudwatch.amazonaws.com, limited to this account by aws:SourceAccount. Merged into policy_json when attach_policy is on; the Sid AllowServicePublish is reserved."
+  description = "Service principals allowed to publish to the topic, such as cloudwatch.amazonaws.com, limited to this account by aws:SourceAccount or aws:SourceOwner, whichever the service sends. Merged into policy_json when attach_policy is on; the Sids AllowServicePublishBySourceAccount and AllowServicePublishBySourceOwner are reserved."
   default     = []
 }
 

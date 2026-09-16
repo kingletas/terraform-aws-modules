@@ -69,7 +69,7 @@ variable "port" {
 
 variable "parameters" {
   type        = map(string)
-  description = "Cluster parameters. A parameter group is created only when this is non-empty. TLS is enabled here by default."
+  description = "Cluster parameters for the parameter group the module always creates. TLS is enabled here by default, and audit_logs is set to enabled unless this map sets it."
   default     = { tls = "enabled", audit_logs = "enabled" }
 }
 

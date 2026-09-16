@@ -2,6 +2,8 @@ data "aws_region" "current" {}
 
 data "aws_partition" "current" {}
 
+data "aws_caller_identity" "current" {}
+
 locals {
   mail_from_domain = var.mail_from_subdomain == null ? null : format("%s.%s", var.mail_from_subdomain, var.domain)
 
@@ -16,6 +18,10 @@ locals {
       value = format("%s.dkim.amazonses.com", aws_sesv2_email_identity.this.dkim_signing_attributes[0].tokens[index])
     }
   } : {}
+
+  arn_prefix            = format("arn:%s:ses:%s:%s", data.aws_partition.current.partition, data.aws_region.current.region, data.aws_caller_identity.current.account_id)
+  identity_arn          = format("%s:identity/%s", local.arn_prefix, var.domain)
+  configuration_set_arn = format("%s:configuration-set/%s", local.arn_prefix, aws_sesv2_configuration_set.this.configuration_set_name)
 
   smtp_user_name = coalesce(var.smtp_user_name, format("ses-smtp-%s", replace(var.domain, ".", "-")))
 

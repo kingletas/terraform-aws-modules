@@ -33,26 +33,31 @@ skip-check:
   # not the value a caller passes, so it reads every one as unset.
   - CKV_AWS_88   # EC2 public IP: associate_public_ip_address, default false
   - CKV_AWS_91   # ELBv2 access logging: access_logs
-  - CKV_AWS_104  # DocumentDB audit logs: parameters, default enables audit
-  - CKV_AWS_118  # RDS enhanced monitoring: monitoring_interval, default 60
+  - CKV_AWS_104  # DocumentDB audit logs: the module merges audit_logs = enabled
+                 # into parameters unless the caller sets audit_logs itself
   - CKV_AWS_119  # DynamoDB customer-managed key: kms_key_arn
   - CKV_AWS_120  # API Gateway caching: a cost decision, not a security one
   - CKV_AWS_129  # RDS log exports: enabled_cloudwatch_logs_exports
   - CKV_AWS_164  # Transfer server public: endpoint_type defaults to PUBLIC for
                  # key-only SFTP partners; set VPC to keep it private
   - CKV_AWS_224  # ECS exec logging with a customer key: kms_key_arn; the
-                 # module always creates the log group, it cannot invent a key
+                 # module creates the log group under the default OVERRIDE
+                 # logging, but it cannot invent a key
   - CKV_AWS_225  # API Gateway method caching: as CKV_AWS_120
-  - CKV_AWS_226  # RDS minor upgrades: auto_minor_version_upgrade, default true
+  - CKV_AWS_226  # RDS minor upgrades: aurora-cluster leaves auto_minor_version_upgrade
+                 # unset, which AWS treats as true; checkov wants it written
   - CKV_AWS_272  # Lambda code signing: needs a signing profile the caller owns
-  - CKV_AWS_304  # Secret rotation: rotation, and it needs a rotation function
+  - CKV_AWS_304  # Secret rotation: rotation.automatically_after_days, default 30;
+                 # rotation itself needs a function the caller owns
   - CKV_AWS_317  # OpenSearch audit logs: log_publishing
   - CKV_AWS_318  # OpenSearch dedicated masters: dedicated_master, a cost decision
   - CKV_AWS_324  # RDS cluster log capture: enabled_cloudwatch_logs_exports
-  - CKV2_AWS_4   # API Gateway logging level: access logging is always on here
+  - CKV2_AWS_4   # API Gateway execution logging level: not set; the stage always
+                 # writes access logs instead
   - CKV2_AWS_10  # CloudTrail to CloudWatch: cloudwatch_log_group_arn
   - CKV2_AWS_27  # Aurora query logging: cluster_parameters
   - CKV2_AWS_32  # CloudFront response headers policy: response_headers_policy_id
+                 # on default_behaviour and each ordered behaviour
   - CKV2_AWS_34  # SSM parameter encryption: the type is the caller's choice
   - CKV2_AWS_51  # API Gateway client certificates: the caller's auth model
   - CKV2_AWS_52  # OpenSearch fine-grained access: master_user or master_user_arn;
@@ -76,11 +81,16 @@ skip-check:
   - CKV2_AWS_62  # S3 event notifications: not a security property
 
   # --- Checkov is wrong about the design ---
-  - CKV_AWS_2    # "ALB protocol is HTTPS": the HTTP listener exists to answer
-                 # port 80 with a 301 to HTTPS, which is the recommended shape
+  - CKV_AWS_2    # "ALB protocol is HTTPS": the ALB's port 80 listener answers with
+                 # a 301 to HTTPS while create_https_listener and
+                 # redirect_http_to_https are on, both by default. Turning either
+                 # off makes it forward plain HTTP, an explicit opt-in. Also
+                 # flagged on NLB listeners, whose protocol is a variable
   - CKV_AWS_103  # "Load balancer uses TLS 1.2": flagged on the plain HTTP
-                 # listener above and on a TCP listener, neither of which has TLS
-  - CKV2_AWS_20  # "ALB redirects HTTP to HTTPS": it does, via redirect_http_to_https
+                 # listener above and on NLB listeners, which default to TCP;
+                 # a TLS listener's ssl_policy defaults to a TLS 1.2 minimum policy
+  - CKV2_AWS_20  # "ALB redirects HTTP to HTTPS": as CKV_AWS_2, it redirects under
+                 # the defaults, and an HTTP-only load balancer is an explicit opt-in
   - CKV_AWS_109  # A KMS key policy's resource is always "*", which means this key
   - CKV_AWS_111  # As CKV_AWS_109
   - CKV_AWS_356  # As CKV_AWS_109

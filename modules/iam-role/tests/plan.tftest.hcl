@@ -123,6 +123,117 @@ run "refuses_a_partly_wildcarded_github_owner" {
   expect_failures = [var.trusted_oidc_providers]
 }
 
+run "refuses_a_github_trust_whose_key_differs_only_in_case" {
+  command = plan
+
+  variables {
+    trusted_oidc_providers = {
+      github = {
+        provider_arn = "arn:aws:iam::123456789012:oidc-provider/Token.Actions.GitHubUserContent.com"
+        audience_key = "Token.Actions.GitHubUserContent.com:aud"
+        audiences    = ["sts.amazonaws.com"]
+        subject_key  = "Token.Actions.GitHubUserContent.com:sub"
+        subjects     = ["*/*"]
+      }
+    }
+  }
+
+  expect_failures = [var.trusted_oidc_providers]
+}
+
+run "refuses_a_github_trust_recognised_only_by_its_provider" {
+  command = plan
+
+  variables {
+    trusted_oidc_providers = {
+      github = {
+        provider_arn = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
+        audience_key = "token.actions.githubusercontent.com:aud"
+        audiences    = ["sts.amazonaws.com"]
+        subject_key  = "issuer.example.com:sub"
+        subjects     = ["*/*"]
+      }
+    }
+  }
+
+  expect_failures = [var.trusted_oidc_providers]
+}
+
+run "refuses_a_github_owner_with_a_trailing_wildcard" {
+  command = plan
+
+  variables {
+    trusted_oidc_providers = {
+      github = {
+        provider_arn = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
+        audience_key = "token.actions.githubusercontent.com:aud"
+        audiences    = ["sts.amazonaws.com"]
+        subject_key  = "token.actions.githubusercontent.com:sub"
+        subjects     = ["repo:owner*/x"]
+      }
+    }
+  }
+
+  expect_failures = [var.trusted_oidc_providers]
+}
+
+run "refuses_a_wildcard_owner_id_in_a_custom_claim_template" {
+  command = plan
+
+  variables {
+    trusted_oidc_providers = {
+      github = {
+        provider_arn = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
+        audience_key = "token.actions.githubusercontent.com:aud"
+        audiences    = ["sts.amazonaws.com"]
+        subject_key  = "token.actions.githubusercontent.com:sub"
+        subjects     = ["repository_owner_id:*:repo:example-org/app:ref:refs/heads/main"]
+      }
+    }
+  }
+
+  expect_failures = [var.trusted_oidc_providers]
+}
+
+run "refuses_a_github_subject_that_opens_with_a_claim_naming_no_owner" {
+  command = plan
+
+  variables {
+    trusted_oidc_providers = {
+      github = {
+        provider_arn = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
+        audience_key = "token.actions.githubusercontent.com:aud"
+        audiences    = ["sts.amazonaws.com"]
+        subject_key  = "token.actions.githubusercontent.com:sub"
+        subjects     = ["environment:production"]
+      }
+    }
+  }
+
+  expect_failures = [var.trusted_oidc_providers]
+}
+
+run "accepts_a_custom_claim_template_opening_with_the_owner_id" {
+  command = plan
+
+  variables {
+    trusted_oidc_providers = {
+      github = {
+        provider_arn = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
+        audience_key = "token.actions.githubusercontent.com:aud"
+        audiences    = ["sts.amazonaws.com"]
+        subject_key  = "token.actions.githubusercontent.com:sub"
+        subjects     = ["repository_owner_id:12345:repo:example-org/app:ref:refs/heads/main"]
+      }
+    }
+  }
+
+  assert {
+    condition     = local.oidc_statement_ids["github"] == "TrustOidcGithub"
+    error_message = "A custom claim template should plan like the default one."
+  }
+}
+
 run "refuses_keys_that_collide_as_statement_ids" {
   command = plan
 

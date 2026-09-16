@@ -40,7 +40,7 @@ module "deploy_role" {
 }
 ```
 
-**Every OIDC trust needs `subject_key` and at least one subject.** Without a subject condition the trust would accept a token from *any* repository on GitHub, so the module refuses it at plan. It also refuses a subject made only of wildcards, and a GitHub subject that does not start with `repo:<owner>/` and a literal owner, such as `repo:example-org/app:ref:refs/heads/main`.
+**Every OIDC trust needs `subject_key` and at least one subject.** Without a subject condition the trust would accept a token from *any* repository on GitHub, so the module refuses it at plan. It also refuses a subject made only of wildcards. A GitHub subject must open with a claim that names one owner or repository (`repo`, `repository`, `repository_id`, `repository_owner`, `repository_owner_id` or `job_workflow_ref`) and a literal value for it, so `repo:example-org/app:ref:refs/heads/main` and a custom claim template such as `repository_owner_id:12345:repo:example-org/app:ref:refs/heads/main` are accepted, while `repo:example-*/app` and `repository_owner_id:*:...` are refused. The module treats a trust as GitHub when the provider ARN, the audience key or the subject key names `token.actions.githubusercontent.com` in any case, or when a subject starts with `repo:`. A subject that opens with any other claim, such as `environment:` or `enterprise:`, is refused, so enterprise-level subject templates are not supported.
 
 Each key in `trusted_oidc_providers` becomes a policy statement ID, which allows only letters and digits. Keys must still differ once everything else is stripped, so `ci-main` and `ci_main` cannot both be used.
 
@@ -82,7 +82,7 @@ Each key in `trusted_oidc_providers` becomes a policy statement ID, which allows
 | description | What this role is for. | `string` | `null` | no |
 | trusted\_services | AWS service principals allowed to assume the role, such as ec2.amazonaws.com. | `list(string)` | `[]` | no |
 | trusted\_role\_arns | IAM role or account ARNs allowed to assume the role. | `list(string)` | `[]` | no |
-| trusted\_oidc\_providers | OIDC providers allowed to assume the role, keyed by a stable name. Each must name the subject claim and the subjects it accepts; a GitHub subject must start with repo:<owner>/ and a literal owner. | <pre>map(object({<br/>    provider_arn = string<br/>    audience_key = string<br/>    audiences    = list(string)<br/>    subject_key  = string<br/>    subjects     = list(string)<br/>  }))</pre> | `{}` | no |
+| trusted\_oidc\_providers | OIDC providers allowed to assume the role, keyed by a stable name. Each must name the subject claim and the subjects it accepts; a GitHub subject must open with an owner or repository claim whose value is a literal, such as repo:example-org/ or repository\_owner\_id:12345:. | <pre>map(object({<br/>    provider_arn = string<br/>    audience_key = string<br/>    audiences    = list(string)<br/>    subject_key  = string<br/>    subjects     = list(string)<br/>  }))</pre> | `{}` | no |
 | require\_mfa | Require multi-factor authentication on assume. Applies to the role and account principals only. | `bool` | `false` | no |
 | external\_id | External ID a third party must present on assume. The defence against the confused deputy problem. | `string` | `null` | no |
 | max\_session\_duration | Longest session in seconds, between one and twelve hours. | `number` | `3600` | no |

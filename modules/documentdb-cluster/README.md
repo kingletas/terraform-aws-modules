@@ -20,7 +20,7 @@ module "documents" {
 ## Notes
 
 - **DocumentDB is MongoDB-compatible, not MongoDB.** Compatibility is by API version, and drivers sometimes use commands it does not implement. Check the supported operations before porting an application.
-- `parameters` defaults to `tls = enabled` and `audit_logs = enabled`, so clients need the Amazon RDS certificate bundle. Setting `parameters` replaces that whole map, so include both keys in your own map to keep them. Turning TLS off is a parameter change and a cluster reboot.
+- `parameters` defaults to `tls = enabled` and `audit_logs = enabled`, so clients need the Amazon RDS certificate bundle. Setting `parameters` replaces that map, so include `tls` in your own map to keep it. `audit_logs = enabled` is added to any map that does not set `audit_logs`, so audit logging only turns off when you set it to `disabled` yourself. The module always creates a parameter group for this reason. Turning TLS off is a parameter change and a cluster reboot.
 - The first instance is the writer. Reads go to `reader_endpoint`.
 
 <!-- BEGIN_TF_DOCS -->
@@ -60,7 +60,7 @@ module "documents" {
 | subnet\_ids | Subnets for the DB subnet group. Private subnets in at least two availability zones. | `list(string)` | n/a | yes |
 | security\_group\_ids | Security groups controlling who may connect. | `list(string)` | `[]` | no |
 | port | Port to listen on. | `number` | `27017` | no |
-| parameters | Cluster parameters. A parameter group is created only when this is non-empty. TLS is enabled here by default. | `map(string)` | <pre>{<br/>  "audit_logs": "enabled",<br/>  "tls": "enabled"<br/>}</pre> | no |
+| parameters | Cluster parameters for the parameter group the module always creates. TLS is enabled here by default, and audit\_logs is set to enabled unless this map sets it. | `map(string)` | <pre>{<br/>  "audit_logs": "enabled",<br/>  "tls": "enabled"<br/>}</pre> | no |
 | parameter\_group\_family | Parameter group family, such as docdb5.0. | `string` | `"docdb5.0"` | no |
 | backup\_retention\_period | Days of automated backups. | `number` | `14` | no |
 | preferred\_backup\_window | Daily backup window in UTC. | `string` | `"03:00-04:00"` | no |

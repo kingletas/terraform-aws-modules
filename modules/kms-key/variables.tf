@@ -57,7 +57,7 @@ variable "admin_arns" {
 
 variable "include_caller_as_admin" {
   type        = bool
-  description = "Add the identity running Terraform to admin_arns, resolved to its role for an assumed-role session. AWS refuses to create a key whose policy would lock that identity out, so turn this off only when admin_arns already names it."
+  description = "Add the identity running Terraform to admin_arns, resolved to its role for an assumed-role session, so AWS does not refuse a policy that locks it out. The policy then changes with whoever applies; turn this off and list every administrator, including each identity that applies, for a stable policy."
   default     = true
 }
 
@@ -69,7 +69,7 @@ variable "user_arns" {
 
 variable "service_principals" {
   type        = list(string)
-  description = "AWS service principals allowed to encrypt, decrypt and describe with the key, such as logs.us-east-1.amazonaws.com. Granted when the request comes from this account."
+  description = "AWS service principals allowed to encrypt, decrypt and describe with the key, such as logs.us-east-1.amazonaws.com. Granted when the request comes from this account; a CloudWatch Logs principal only for log groups in this account."
   default     = []
 
   validation {

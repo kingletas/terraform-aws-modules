@@ -104,7 +104,7 @@ run "grants_services_scoped_to_the_account" {
   command = plan
 
   variables {
-    service_principals = ["logs.us-east-1.amazonaws.com"]
+    service_principals = ["sns.amazonaws.com"]
   }
 
   assert {
@@ -132,4 +132,66 @@ run "refuses_a_service_principal_that_is_not_a_service" {
   }
 
   expect_failures = [var.service_principals]
+}
+
+run "scopes_cloudwatch_logs_to_this_accounts_log_groups" {
+  command = plan
+
+  variables {
+    service_principals = ["logs.us-east-1.amazonaws.com", "logs.eu-west-1.amazonaws.com", "sns.amazonaws.com"]
+  }
+
+  assert {
+    condition = one([
+      for statement in data.aws_iam_policy_document.this.statement : one(statement.principals).identifiers
+      if statement.sid == "AllowServiceUse"
+    ]) == toset(["sns.amazonaws.com"])
+    error_message = "CloudWatch Logs must not share the grant conditioned only on the source account."
+  }
+
+  assert {
+    condition = jsonencode(one([
+      for statement in data.aws_iam_policy_document.this.statement : [
+        for condition in statement.condition : [condition.test, condition.variable, sort(condition.values)]
+      ]
+      if statement.sid == "AllowCloudWatchLogsUse"
+      ])) == jsonencode([
+      ["ArnLike", "kms:EncryptionContext:aws:logs:arn", ["arn:aws:logs:eu-west-1:123456789012:*", "arn:aws:logs:us-east-1:123456789012:*"]],
+    ])
+    error_message = "CloudWatch Logs use must require a log group in this account, in the principal's region, and nothing weaker."
+  }
+}
+
+run "scopes_cloudwatch_logs_named_as_a_delivery_service" {
+  command = plan
+
+  variables {
+    delivery_service_principals = ["logs.cn-north-1.amazonaws.com.cn"]
+  }
+
+  override_data {
+    target = data.aws_partition.current
+    values = {
+      partition  = "aws-cn"
+      dns_suffix = "amazonaws.com.cn"
+    }
+  }
+
+  assert {
+    condition = length([
+      for statement in data.aws_iam_policy_document.this.statement : statement
+      if statement.sid == "AllowDeliveryServices"
+    ]) == 0
+    error_message = "With only CloudWatch Logs named, there must be no source-account delivery grant."
+  }
+
+  assert {
+    condition = one(flatten([
+      for statement in data.aws_iam_policy_document.this.statement : [
+        for condition in statement.condition : condition.values if condition.variable == "kms:EncryptionContext:aws:logs:arn"
+      ]
+      if statement.sid == "AllowCloudWatchLogsDelivery"
+    ])) == "arn:aws-cn:logs:cn-north-1:123456789012:*"
+    error_message = "CloudWatch Logs delivery must be scoped to this account's log groups, in the partition's ARN form."
+  }
 }

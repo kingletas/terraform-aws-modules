@@ -29,7 +29,7 @@ variable "trusted_oidc_providers" {
     subject_key  = string
     subjects     = list(string)
   }))
-  description = "OIDC providers allowed to assume the role, keyed by a stable name. Each must name the subject claim and the subjects it accepts; a GitHub subject must start with repo:<owner>/ and a literal owner."
+  description = "OIDC providers allowed to assume the role, keyed by a stable name. Each must name the subject claim and the subjects it accepts; a GitHub subject must open with an owner or repository claim whose value is a literal, such as repo:example-org/ or repository_owner_id:12345:."
   default     = {}
 
   validation {
@@ -48,14 +48,17 @@ variable "trusted_oidc_providers" {
     error_message = "An OIDC subject cannot be empty or made only of wildcards."
   }
 
-  # A GitHub subject is recognised by its claim key or by the repo: prefix.
+  # IAM matches condition keys without regard to case, so GitHub is recognised case-insensitively on every field.
   validation {
     condition = alltrue(flatten([
       for key, provider in var.trusted_oidc_providers : [
-        for subject in provider.subjects : can(regex("^repo:[A-Za-z0-9][A-Za-z0-9-]*/[^/]", subject))
-      ] if strcontains(provider.subject_key, "token.actions.githubusercontent.com") || anytrue([for subject in provider.subjects : startswith(subject, "repo:")])
+        for subject in provider.subjects : can(regex("^(repo|repository|repository_id|repository_owner|repository_owner_id|job_workflow_ref):[^*?:/$]+([:/]|$)", subject))
+        ] if anytrue(concat(
+          [for field in [provider.provider_arn, provider.audience_key, provider.subject_key] : strcontains(lower(field), "token.actions.githubusercontent.com")],
+          [for subject in provider.subjects : startswith(lower(subject), "repo:")],
+      ))
     ]))
-    error_message = "A GitHub OIDC subject must start with repo:<owner>/ with a literal owner, such as repo:example-org/app:ref:refs/heads/main."
+    error_message = "A GitHub OIDC subject must open with a claim that names one owner or repository, followed by a literal value with no wildcard, such as repo:example-org/app:ref:refs/heads/main or repository_owner_id:12345:repo:example-org/app:ref:refs/heads/main."
   }
 
   validation {

@@ -48,7 +48,7 @@ Set `OPTIONAL` if you send to an audience you do not control and would rather de
 
 ## SMTP needs an IAM user, and most applications should not use SMTP
 
-`create_smtp_user` is off. When it is on, the module creates an IAM user, an access key, and a policy that permits sending only from addresses on this domain (`*@<domain>`).
+`create_smtp_user` is off. When it is on, the module creates an IAM user, an access key, and a policy that permits sending only through this identity and its configuration set, and only from addresses on this domain (`*@<domain>`).
 
 That is a long-lived credential, which is what this library otherwise works hard to avoid. There is no way around it: **SMTP authenticates with a username and password and has nowhere to put a session token**, so a role cannot be used. The SES SMTP password is an IAM secret access key put through a derivation, which the AWS provider computes as `ses_smtp_password_v4`.
 

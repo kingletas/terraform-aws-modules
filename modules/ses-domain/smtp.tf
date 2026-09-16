@@ -21,10 +21,12 @@ data "aws_iam_policy_document" "smtp" {
   count = var.create_smtp_user ? 1 : 0
 
   statement {
-    sid       = "SendThroughThisIdentityOnly"
-    effect    = "Allow"
-    actions   = ["ses:SendRawEmail", "ses:SendEmail"]
-    resources = ["*"]
+    sid     = "SendThroughThisIdentityOnly"
+    effect  = "Allow"
+    actions = ["ses:SendRawEmail", "ses:SendEmail"]
+
+    # SES authorises a send on the identity and on the configuration set it uses.
+    resources = [local.identity_arn, local.configuration_set_arn]
 
     condition {
       test     = "StringLike"

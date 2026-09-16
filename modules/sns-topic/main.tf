@@ -1,6 +1,11 @@
 locals {
   service_grant = length(var.publishing_services) > 0
 
+  source_account_keys = {
+    SourceAccount = "aws:SourceAccount"
+    SourceOwner   = "aws:SourceOwner"
+  }
+
   suffix     = var.fifo_topic ? ".fifo" : ""
   topic_name = format("%s%s", trimsuffix(var.name, ".fifo"), local.suffix)
 }
@@ -25,30 +30,35 @@ data "aws_iam_policy_document" "this" {
 
   source_policy_documents = var.attach_policy ? [var.policy_json] : []
 
-  statement {
-    sid       = "AllowServicePublish"
-    effect    = "Allow"
-    actions   = ["sns:Publish"]
-    resources = [aws_sns_topic.this.arn]
+  # Services name the source account under one of two keys, so each gets a statement and a request with neither is denied.
+  dynamic "statement" {
+    for_each = local.source_account_keys
 
-    principals {
-      type        = "Service"
-      identifiers = var.publishing_services
-    }
+    content {
+      sid       = format("AllowServicePublishBy%s", statement.key)
+      effect    = "Allow"
+      actions   = ["sns:Publish"]
+      resources = [aws_sns_topic.this.arn]
 
-    condition {
-      test     = "StringEquals"
-      variable = "aws:SourceAccount"
-      values   = [data.aws_caller_identity.current.account_id]
-    }
+      principals {
+        type        = "Service"
+        identifiers = var.publishing_services
+      }
 
-    dynamic "condition" {
-      for_each = length(var.publishing_source_arns) > 0 ? [var.publishing_source_arns] : []
+      condition {
+        test     = "StringEquals"
+        variable = statement.value
+        values   = [data.aws_caller_identity.current.account_id]
+      }
 
-      content {
-        test     = "ArnLike"
-        variable = "aws:SourceArn"
-        values   = condition.value
+      dynamic "condition" {
+        for_each = length(var.publishing_source_arns) > 0 ? [var.publishing_source_arns] : []
+
+        content {
+          test     = "ArnLike"
+          variable = "aws:SourceArn"
+          values   = condition.value
+        }
       }
     }
   }

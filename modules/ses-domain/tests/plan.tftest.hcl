@@ -130,6 +130,14 @@ run "limits_the_smtp_user_to_addresses_on_the_domain" {
     condition     = contains(one(one(data.aws_iam_policy_document.smtp[0].statement).condition).values, "*@example.com")
     error_message = "The SMTP user must be limited to addresses on the identity domain."
   }
+
+  assert {
+    condition = one(data.aws_iam_policy_document.smtp[0].statement).resources == toset([
+      "arn:aws:ses:us-east-1:123456789012:identity/example.com",
+      "arn:aws:ses:us-east-1:123456789012:configuration-set/example-com",
+    ])
+    error_message = "The SMTP user must send only through this identity and its configuration set, not every identity in the account."
+  }
 }
 
 run "publishes_easy_dkim_records" {

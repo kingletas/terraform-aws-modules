@@ -1,5 +1,8 @@
 locals {
   tags = merge(var.tags, { Name = var.name })
+
+  # Audit logging stays on unless the caller sets audit_logs themselves.
+  parameters = merge({ audit_logs = "enabled" }, var.parameters)
 }
 
 resource "aws_docdb_subnet_group" "this" {
@@ -11,14 +14,12 @@ resource "aws_docdb_subnet_group" "this" {
 }
 
 resource "aws_docdb_cluster_parameter_group" "this" {
-  count = length(var.parameters) > 0 ? 1 : 0
-
   name_prefix = format("%s-", var.name)
   family      = var.parameter_group_family
   description = format("Parameters for %s", var.name)
 
   dynamic "parameter" {
-    for_each = var.parameters
+    for_each = local.parameters
 
     content {
       name  = parameter.key
@@ -33,6 +34,11 @@ resource "aws_docdb_cluster_parameter_group" "this" {
   }
 }
 
+moved {
+  from = aws_docdb_cluster_parameter_group.this[0]
+  to   = aws_docdb_cluster_parameter_group.this
+}
+
 resource "aws_docdb_cluster" "this" {
   cluster_identifier = var.name
   engine             = "docdb"
@@ -45,7 +51,7 @@ resource "aws_docdb_cluster" "this" {
 
   db_subnet_group_name            = aws_docdb_subnet_group.this.name
   vpc_security_group_ids          = var.security_group_ids
-  db_cluster_parameter_group_name = length(var.parameters) > 0 ? aws_docdb_cluster_parameter_group.this[0].name : null
+  db_cluster_parameter_group_name = aws_docdb_cluster_parameter_group.this.name
 
   storage_encrypted = true
   kms_key_id        = var.kms_key_arn

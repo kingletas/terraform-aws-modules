@@ -2,6 +2,24 @@ locals {
   symmetric  = var.customer_master_key_spec == "SYMMETRIC_DEFAULT"
   add_caller = var.include_caller_as_admin && length(var.admin_arns) > 0
   tags       = merge(var.tags, { Name = var.name })
+
+  # CloudWatch Logs is scoped by the log group ARN it puts in the encryption context, which names the account.
+  logs_principal_pattern = "^logs\\.(?:([a-z0-9-]+)\\.)?amazonaws\\.com(?:\\.cn)?$"
+
+  service_principals          = [for principal in var.service_principals : principal if !can(regex(local.logs_principal_pattern, principal))]
+  logs_service_principals     = [for principal in var.service_principals : principal if can(regex(local.logs_principal_pattern, principal))]
+  delivery_service_principals = [for principal in var.delivery_service_principals : principal if !can(regex(local.logs_principal_pattern, principal))]
+  logs_delivery_principals    = [for principal in var.delivery_service_principals : principal if can(regex(local.logs_principal_pattern, principal))]
+
+  logs_arns = {
+    for principal in distinct(concat(local.logs_service_principals, local.logs_delivery_principals)) :
+    principal => format(
+      "arn:%s:logs:%s:%s:*",
+      data.aws_partition.current.partition,
+      coalesce(one(regex(local.logs_principal_pattern, principal)), "*"),
+      data.aws_caller_identity.current.account_id,
+    )
+  }
 }
 
 data "aws_caller_identity" "current" {}
@@ -55,7 +73,7 @@ data "aws_iam_policy_document" "this" {
   }
 
   dynamic "statement" {
-    for_each = length(var.service_principals) > 0 ? [1] : []
+    for_each = length(local.service_principals) > 0 ? [1] : []
 
     content {
       sid    = "AllowServiceUse"
@@ -73,7 +91,7 @@ data "aws_iam_policy_document" "this" {
 
       principals {
         type        = "Service"
-        identifiers = var.service_principals
+        identifiers = local.service_principals
       }
 
       # IfExists keeps use working for a service that does not send its source account.
@@ -86,7 +104,37 @@ data "aws_iam_policy_document" "this" {
   }
 
   dynamic "statement" {
-    for_each = length(var.delivery_service_principals) > 0 ? [1] : []
+    for_each = length(local.logs_service_principals) > 0 ? [1] : []
+
+    content {
+      sid    = "AllowCloudWatchLogsUse"
+      effect = "Allow"
+
+      actions = [
+        "kms:Encrypt",
+        "kms:Decrypt",
+        "kms:ReEncrypt*",
+        "kms:GenerateDataKey*",
+        "kms:DescribeKey",
+      ]
+
+      resources = ["*"]
+
+      principals {
+        type        = "Service"
+        identifiers = local.logs_service_principals
+      }
+
+      condition {
+        test     = "ArnLike"
+        variable = "kms:EncryptionContext:aws:logs:arn"
+        values   = distinct([for principal in local.logs_service_principals : local.logs_arns[principal]])
+      }
+    }
+  }
+
+  dynamic "statement" {
+    for_each = length(local.delivery_service_principals) > 0 ? [1] : []
 
     content {
       sid       = "AllowDeliveryServices"
@@ -96,7 +144,7 @@ data "aws_iam_policy_document" "this" {
 
       principals {
         type        = "Service"
-        identifiers = var.delivery_service_principals
+        identifiers = local.delivery_service_principals
       }
 
       # IfExists keeps delivery working for a service that does not send its source account.
@@ -104,6 +152,28 @@ data "aws_iam_policy_document" "this" {
         test     = "StringEqualsIfExists"
         variable = "aws:SourceAccount"
         values   = [data.aws_caller_identity.current.account_id]
+      }
+    }
+  }
+
+  dynamic "statement" {
+    for_each = length(local.logs_delivery_principals) > 0 ? [1] : []
+
+    content {
+      sid       = "AllowCloudWatchLogsDelivery"
+      effect    = "Allow"
+      actions   = ["kms:Decrypt", "kms:GenerateDataKey*"]
+      resources = ["*"]
+
+      principals {
+        type        = "Service"
+        identifiers = local.logs_delivery_principals
+      }
+
+      condition {
+        test     = "ArnLike"
+        variable = "kms:EncryptionContext:aws:logs:arn"
+        values   = distinct([for principal in local.logs_delivery_principals : local.logs_arns[principal]])
       }
     }
   }
