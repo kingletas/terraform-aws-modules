@@ -1,5 +1,17 @@
 locals {
   tags = merge(var.tags, { Name = var.name })
+
+  root_device_name = coalesce(var.root_volume.device_name, data.aws_ami.this.root_device_name)
+}
+
+# The root device name differs between AMI families, so it is read from the image.
+data "aws_ami" "this" {
+  include_deprecated = true
+
+  filter {
+    name   = "image-id"
+    values = [var.image_id]
+  }
 }
 
 resource "aws_launch_template" "this" {
@@ -33,7 +45,7 @@ resource "aws_launch_template" "this" {
   }
 
   block_device_mappings {
-    device_name = var.root_volume.device_name
+    device_name = local.root_device_name
 
     ebs {
       volume_type           = var.root_volume.type
@@ -68,8 +80,6 @@ resource "aws_launch_template" "this" {
     for_each = var.instance_requirements == null ? [] : [var.instance_requirements]
 
     content {
-      cpu_manufacturers = null
-
       vcpu_count {
         min = instance_requirements.value.vcpu_min
         max = instance_requirements.value.vcpu_max
@@ -91,7 +101,7 @@ resource "aws_launch_template" "this" {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
     http_put_response_hop_limit = 1
-    instance_metadata_tags      = "enabled"
+    instance_metadata_tags      = var.instance_metadata_tags ? "enabled" : "disabled"
   }
 
   capacity_reservation_specification {
@@ -117,5 +127,12 @@ resource "aws_launch_template" "this" {
 
   lifecycle {
     create_before_destroy = true
+
+    precondition {
+      condition = !var.instance_metadata_tags || alltrue([
+        for key in keys(local.tags) : can(regex("^[A-Za-z0-9+=.,_:@-]+$", key)) && !contains([".", "..", "_index"], key)
+      ])
+      error_message = "With instance_metadata_tags on, AWS refuses a tag key containing anything but letters, digits and + - = . , _ : @, or one that is ., .. or _index."
+    }
   }
 }

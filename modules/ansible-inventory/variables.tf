@@ -65,10 +65,16 @@ variable "connection" {
   }
 }
 
+variable "ssm_bucket_name" {
+  type        = string
+  description = "S3 bucket the SSM connection transfers files through. The aws_ssm connection plugin moves every module it runs through this bucket, not only copied files, so a playbook over SSM needs it. The instance role and the runner both need access to it."
+  default     = null
+}
+
 variable "facts" {
   type        = map(string)
   description = <<-EOT
-    Values every host should know — endpoints, bucket names, secret ARNs.
+    Values every host should know: endpoints, bucket names and secret ARNs.
 
     Written to SSM Parameter Store rather than to a file, so every operator and
     every CI runner reads the same values, and a stale local copy cannot exist.
@@ -78,8 +84,13 @@ variable "facts" {
 
 variable "group_vars" {
   type        = map(map(string))
-  description = "Variables per Ansible group, keyed by group name. Written as group_vars files, which are configuration rather than state and belong in git."
+  description = "Variables per Ansible group, keyed by group name. Written as group_vars files, which are configuration rather than state and belong in git. With facts set, group_vars/all.yml also carries the terraform_facts lookup."
   default     = {}
+
+  validation {
+    condition     = !contains(keys(lookup(var.group_vars, "all", {})), "terraform_facts")
+    error_message = "The all group may not set terraform_facts, which the module writes as the lookup for the facts parameter."
+  }
 }
 
 variable "facts_parameter_tier" {

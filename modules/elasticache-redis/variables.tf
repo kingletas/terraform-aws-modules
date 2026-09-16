@@ -28,7 +28,7 @@ variable "node_type" {
 
 variable "num_node_groups" {
   type        = number
-  description = "Number of shards. More than one turns on cluster mode, which most client libraries need to be told about."
+  description = "Number of shards. More than one turns on cluster mode, which most client libraries need to be told about, and needs parameter_group_family so a cluster-enabled parameter group is used."
   default     = 1
 }
 
@@ -68,7 +68,7 @@ variable "parameters" {
 
 variable "parameter_group_family" {
   type        = string
-  description = "Parameter group family, such as valkey8. Required when parameters is non-empty."
+  description = "Parameter group family, such as valkey8. Required when parameters is non-empty or num_node_groups is above 1."
   default     = null
 }
 

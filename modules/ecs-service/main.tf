@@ -9,6 +9,13 @@ locals {
     ] : pair.key => pair if pair.target != null
   }
 
+  service = one(concat(aws_ecs_service.this, aws_ecs_service.autoscaled))
+
+  strategy = var.capacity.capacity_provider_strategy
+  compatibility = var.capacity.launch_type != null ? var.capacity.launch_type : (
+    alltrue([for entry in local.strategy : contains(["FARGATE", "FARGATE_SPOT"], entry.capacity_provider)]) ? "FARGATE" : "EC2"
+  )
+
   container_definitions = [
     for name, container in var.containers : {
       name       = name
@@ -76,7 +83,7 @@ resource "aws_ecs_task_definition" "this" {
   cpu                      = var.cpu
   memory                   = var.memory
   network_mode             = "awsvpc"
-  requires_compatibilities = var.launch_type == null ? ["FARGATE"] : [var.launch_type]
+  requires_compatibilities = [local.compatibility]
 
   task_role_arn      = var.task_role_arn
   execution_role_arn = var.execution_role_arn
@@ -85,27 +92,87 @@ resource "aws_ecs_task_definition" "this" {
 
   runtime_platform {
     operating_system_family = "LINUX"
-    cpu_architecture        = "X86_64"
+    cpu_architecture        = var.cpu_architecture
   }
 
   tags = local.tags
-
-  lifecycle {
-    precondition {
-      condition = var.execution_role_arn != null || alltrue([
-        for name, container in var.containers : length(container.secrets) == 0
-      ])
-      error_message = "Containers naming secrets need an execution_role_arn, because ECS reads them before the task starts."
-    }
-  }
 }
 
+# The task count is Terraform's when autoscaling is off.
 resource "aws_ecs_service" "this" {
+  count = local.scaling == null ? 1 : 0
+
   name            = var.name
   cluster         = var.cluster_arn
   task_definition = aws_ecs_task_definition.this.arn
   desired_count   = var.desired_count
-  launch_type     = var.launch_type
+  launch_type     = var.capacity.launch_type
+
+  # ECS applies a changed strategy only through a new deployment.
+  force_new_deployment = length(local.strategy) > 0
+
+  dynamic "capacity_provider_strategy" {
+    for_each = local.strategy
+
+    content {
+      capacity_provider = capacity_provider_strategy.value.capacity_provider
+      weight            = capacity_provider_strategy.value.weight
+      base              = capacity_provider_strategy.value.base
+    }
+  }
+
+  enable_execute_command            = var.enable_execute_command
+  health_check_grace_period_seconds = length(var.load_balancers) > 0 ? var.health_check_grace_period_seconds : null
+
+  deployment_minimum_healthy_percent = var.deployment.minimum_healthy_percent
+  deployment_maximum_percent         = var.deployment.maximum_percent
+
+  deployment_circuit_breaker {
+    enable   = var.deployment.circuit_breaker
+    rollback = var.deployment.circuit_breaker && var.deployment.rollback_on_failure
+  }
+
+  network_configuration {
+    subnets          = var.subnet_ids
+    security_groups  = var.security_group_ids
+    assign_public_ip = var.assign_public_ip
+  }
+
+  dynamic "load_balancer" {
+    for_each = var.load_balancers
+
+    content {
+      target_group_arn = load_balancer.value.target_group_arn
+      container_name   = load_balancer.value.container_name
+      container_port   = load_balancer.value.container_port
+    }
+  }
+
+  tags = local.tags
+}
+
+# The task count belongs to the scaler once the service is running, so Terraform sets it only at creation.
+resource "aws_ecs_service" "autoscaled" {
+  count = local.scaling == null ? 0 : 1
+
+  name            = var.name
+  cluster         = var.cluster_arn
+  task_definition = aws_ecs_task_definition.this.arn
+  desired_count   = var.desired_count
+  launch_type     = var.capacity.launch_type
+
+  # ECS applies a changed strategy only through a new deployment.
+  force_new_deployment = length(local.strategy) > 0
+
+  dynamic "capacity_provider_strategy" {
+    for_each = local.strategy
+
+    content {
+      capacity_provider = capacity_provider_strategy.value.capacity_provider
+      weight            = capacity_provider_strategy.value.weight
+      base              = capacity_provider_strategy.value.base
+    }
+  }
 
   enable_execute_command            = var.enable_execute_command
   health_check_grace_period_seconds = length(var.load_balancers) > 0 ? var.health_check_grace_period_seconds : null
@@ -137,7 +204,6 @@ resource "aws_ecs_service" "this" {
   tags = local.tags
 
   lifecycle {
-    # Autoscaling owns the task count once the service is running.
     ignore_changes = [desired_count]
   }
 }
@@ -146,7 +212,7 @@ resource "aws_appautoscaling_target" "this" {
   count = local.scaling == null ? 0 : 1
 
   service_namespace  = "ecs"
-  resource_id        = format("service/%s/%s", reverse(split("/", var.cluster_arn))[0], aws_ecs_service.this.name)
+  resource_id        = format("service/%s/%s", reverse(split("/", var.cluster_arn))[0], aws_ecs_service.autoscaled[0].name)
   scalable_dimension = "ecs:service:DesiredCount"
   min_capacity       = local.scaling.min_capacity
   max_capacity       = local.scaling.max_capacity

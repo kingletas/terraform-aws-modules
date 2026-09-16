@@ -93,6 +93,11 @@ resource "aws_autoscaling_group" "this" {
 
     # A scaling policy owns the capacity once the group is running.
     ignore_changes = [desired_capacity]
+
+    precondition {
+      condition     = var.instance_refresh == null || can(regex("^[1-9][0-9]*$", var.launch_template_version))
+      error_message = "Instance refresh needs launch_template_version to be a version number. $Latest and $Default never change, so a template change would start no refresh, and AWS refuses auto rollback with them."
+    }
   }
 }
 
@@ -113,6 +118,26 @@ resource "aws_autoscaling_policy" "target_tracking" {
       content {
         predefined_metric_type = predefined_metric_specification.value.metric_type
         resource_label         = predefined_metric_specification.value.resource_label
+      }
+    }
+
+    dynamic "customized_metric_specification" {
+      for_each = each.value.predefined ? [] : [each.value.customized_metric]
+
+      content {
+        metric_name = customized_metric_specification.value.metric_name
+        namespace   = customized_metric_specification.value.namespace
+        statistic   = customized_metric_specification.value.statistic
+        unit        = customized_metric_specification.value.unit
+
+        dynamic "metric_dimension" {
+          for_each = customized_metric_specification.value.dimensions
+
+          content {
+            name  = metric_dimension.key
+            value = metric_dimension.value
+          }
+        }
       }
     }
   }

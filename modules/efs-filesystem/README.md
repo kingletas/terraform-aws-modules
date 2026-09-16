@@ -1,12 +1,12 @@
 # efs-filesystem
 
-A shared POSIX file system, with mount targets in the subnets you name and a policy that requires TLS.
+A shared POSIX file system, with mount targets in the subnets you name and a file system policy that allows mounting only through those mount targets and requires TLS.
 
 ## Usage
 
 ```hcl
 module "shared" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/efs-filesystem?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/efs-filesystem?ref=v0.3.0"
 
   name               = "platform-shared"
   subnet_ids         = module.vpc.private_subnet_ids
@@ -30,6 +30,7 @@ Mount targets are billed by the hour, so this is a real cost decision as well as
 
 ## Notes
 
+- **Root on a client is squashed by default.** With `allow_client_root_access` off, a client acting as root is treated as an unprivileged user, so it cannot change ownership or read files it does not own. An access point's POSIX identity still applies. Turn it on only for a client that needs root on the file system.
 - The security group on the mount targets needs NFS, TCP 2049, from the clients.
 - An access point pins a directory and a POSIX identity, so a client cannot read outside its own path even if it asks.
 - `throughput_mode` defaults to `elastic`, which bills for what you use. `bursting` scales with how much you have stored, which surprises people on a small but busy file system.
@@ -71,6 +72,7 @@ Mount targets are billed by the hour, so this is a real cost decision as well as
 | kms\_key\_arn | KMS key for encryption at rest. Null uses the AWS-managed EFS key. | `string` | `null` | no |
 | transition\_to\_ia\_days | Move a file to infrequent access after this long untouched. Null keeps everything in standard storage. | `string` | `"AFTER_30_DAYS"` | no |
 | enable\_backup | Turn on the automatic daily backup EFS provides. | `bool` | `true` | no |
+| allow\_client\_root\_access | Let a client act as root on the file system. Off, root on a client is squashed to an unprivileged user, and an access point's POSIX identity still works. | `bool` | `false` | no |
 | access\_points | Access points keyed by a stable name. Each pins a directory and a POSIX identity, so a client cannot read outside its own path. | <pre>map(object({<br/>    path           = string<br/>    owner_uid      = optional(number, 1000)<br/>    owner_gid      = optional(number, 1000)<br/>    permissions    = optional(string, "0755")<br/>    posix_uid      = optional(number, 1000)<br/>    posix_gid      = optional(number, 1000)<br/>    secondary_gids = optional(list(number), [])<br/>  }))</pre> | `{}` | no |
 | tags | Tags applied to every resource this module creates. | `map(string)` | `{}` | no |
 

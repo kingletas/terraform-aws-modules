@@ -1,7 +1,5 @@
 locals {
-  # Every instance in the fleet, flattened from roles into one map keyed by the
-  # instance name. The reference this replaces built the same thing with four
-  # nested merge() calls and carried a FIXME about it.
+  # Every instance in the fleet, flattened from roles into one map keyed by the instance name.
   instances = merge([
     for role_name, role in var.roles : {
       for index in range(role.count) :
@@ -45,6 +43,10 @@ locals {
       }
     }
   ]...)
+
+  subnets_with_volumes = {
+    for name, instance in local.instances : name => instance.subnet_id if length(instance.extra_volumes) > 0
+  }
 
   elastic_ips = { for name, instance in local.instances : name => instance if instance.assign_elastic_ip }
 
@@ -93,7 +95,7 @@ resource "aws_instance" "this" {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
     http_put_response_hop_limit = 1
-    instance_metadata_tags      = "enabled"
+    instance_metadata_tags      = var.instance_metadata_tags ? "enabled" : "disabled"
   }
 
   tags = merge(var.tags, each.value.tags, {
@@ -101,8 +103,15 @@ resource "aws_instance" "this" {
     Role = each.value.role
   })
 
+  # Destroy-first, so an extra volume is detached from the old instance before it is attached to the new one.
   lifecycle {
-    create_before_destroy = true
+    precondition {
+      condition = !var.instance_metadata_tags || alltrue([
+        for key in keys(merge(var.tags, each.value.tags, { Name = "", Role = "" })) :
+        can(regex("^[A-Za-z0-9+=.,_:@-]+$", key)) && !contains([".", "..", "_index"], key)
+      ])
+      error_message = "With instance_metadata_tags on, AWS refuses a tag key containing anything but letters, digits and + - = . , _ : @, or one that is ., .. or _index."
+    }
   }
 }
 
@@ -116,10 +125,17 @@ resource "aws_eip" "this" {
   tags = merge(var.tags, each.value.tags, { Name = each.key })
 }
 
+# A volume takes its zone from the subnet, which outlives any one instance, so replacing an instance keeps the volume.
+data "aws_subnet" "volume" {
+  for_each = local.subnets_with_volumes
+
+  id = each.value
+}
+
 resource "aws_ebs_volume" "this" {
   for_each = local.volume_attachments
 
-  availability_zone = aws_instance.this[each.value.instance_name].availability_zone
+  availability_zone = data.aws_subnet.volume[each.value.instance_name].availability_zone
   size              = each.value.volume.size
   type              = each.value.volume.type
   iops              = contains(["gp3", "io1", "io2"], each.value.volume.type) ? each.value.volume.iops : null
@@ -137,5 +153,6 @@ resource "aws_volume_attachment" "this" {
   volume_id   = aws_ebs_volume.this[each.key].id
   instance_id = aws_instance.this[each.value.instance_name].id
 
+  # Detaching a mounted volume hangs unless the instance is stopped first.
   stop_instance_before_detaching = true
 }

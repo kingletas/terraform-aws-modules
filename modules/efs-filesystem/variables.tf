@@ -65,6 +65,12 @@ variable "enable_backup" {
   default     = true
 }
 
+variable "allow_client_root_access" {
+  type        = bool
+  description = "Let a client act as root on the file system. Off, root on a client is squashed to an unprivileged user, and an access point's POSIX identity still works."
+  default     = false
+}
+
 variable "access_points" {
   type = map(object({
     path           = string

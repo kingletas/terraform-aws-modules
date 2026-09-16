@@ -8,7 +8,7 @@ Instances are named `name-01`, `name-02` and so on, and every output is keyed by
 
 ```hcl
 module "app" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/ec2-instance?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/ec2-instance?ref=v0.3.0"
 
   name           = "platform-app"
   instance_count = 3
@@ -36,11 +36,11 @@ Three things are not options, because turning them off is a defect rather than a
 
 - **IMDSv2 is required.** Token-less instance metadata is what a server-side request forgery bug reaches to steal role credentials. The hop limit is 1, so a container on the instance cannot reach it either.
 - **Every volume is encrypted**, root and extra. `kms_key_id` chooses the key; leaving it null uses the AWS-managed EBS key.
-- **`create_before_destroy` is on**, so a replacement is built before the old instance goes away.
+- **A replacement is destroy-first.** An extra volume can be attached to one instance at a time, so the old instance is stopped, its volumes detached and the instance destroyed before the new one is built and the same volumes attached to it. Expect a short gap while the instance is replaced.
 
 ## Extra volumes
 
-`extra_volumes` attaches the same set of volumes to every instance. Each is created in the instance's own availability zone, and detaching stops the instance first — otherwise a mounted volume hangs the detach.
+`extra_volumes` attaches the same set of volumes to every instance. Each volume takes its availability zone from the instance's subnet, not from the instance, so it survives a replacement and is attached to the new instance. The volumes are never deleted with an instance; one is deleted only when you remove it from `extra_volumes` or remove its instance by lowering `instance_count`. Detaching stops the instance first, because detaching a mounted volume hangs.
 
 ```hcl
 extra_volumes = {
@@ -57,13 +57,14 @@ Formatting and mounting the volume is the caller's job, in `user_data`.
 
 ## Reaching the instances
 
-There is no SSH provisioner here. An earlier version of this code set hostnames over `remote-exec`, which meant Terraform could not finish without a working SSH path from wherever it happened to run.
+The module has no SSH provisioner, so Terraform needs no network path to the instances to finish an apply.
 
-Use cloud-init through `user_data` for anything that must happen at first boot, and Systems Manager Session Manager to get a shell. Session Manager needs `AmazonSSMManagedInstanceCore` on the instance profile and nothing inbound at all — see `examples/ec2-in-vpc`.
+Use cloud-init through `user_data` for anything that must happen at first boot, and Systems Manager Session Manager to get a shell. Session Manager needs `AmazonSSMManagedInstanceCore` on the instance profile and nothing inbound at all. See `examples/ec2-in-vpc`.
 
 ## Notes
 
 - `user_data_replace_on_change` is on. Changing user data replaces the instance, rather than leaving one running that no longer matches its own configuration.
+- `instance_metadata_tags` is off by default. Turn it on to read the instance's tags from the metadata service. AWS then refuses tag keys containing anything other than letters, digits and `+ - = . , _ : @` (so no spaces or slashes), and the plan checks this.
 - `iops` and `throughput` are ignored for volume types that do not accept them, so you can leave them set while switching type.
 
 <!-- BEGIN_TF_DOCS -->
@@ -106,8 +107,9 @@ Use cloud-init through `user_data` for anything that must happen at first boot, 
 | ebs\_optimized | Enable EBS optimization. | `bool` | `true` | no |
 | monitoring | Enable detailed CloudWatch monitoring at one-minute resolution. | `bool` | `true` | no |
 | root\_volume | Root EBS volume settings. Always encrypted. | <pre>object({<br/>    type                  = optional(string, "gp3")<br/>    size                  = optional(number, 20)<br/>    iops                  = optional(number)<br/>    throughput            = optional(number)<br/>    delete_on_termination = optional(bool, true)<br/>  })</pre> | `{}` | no |
-| extra\_volumes | Additional EBS volumes attached to every instance, keyed by a stable name. | <pre>map(object({<br/>    device_name           = string<br/>    size                  = number<br/>    type                  = optional(string, "gp3")<br/>    iops                  = optional(number)<br/>    throughput            = optional(number)<br/>    delete_on_termination = optional(bool, false)<br/>  }))</pre> | `{}` | no |
+| extra\_volumes | Additional EBS volumes attached to every instance, keyed by a stable name. They are separate volumes, so they outlive the instance and are never deleted with it. | <pre>map(object({<br/>    device_name = string<br/>    size        = number<br/>    type        = optional(string, "gp3")<br/>    iops        = optional(number)<br/>    throughput  = optional(number)<br/>  }))</pre> | `{}` | no |
 | kms\_key\_id | KMS key for EBS encryption. Defaults to the AWS-managed EBS key. | `string` | `null` | no |
+| instance\_metadata\_tags | Expose instance tags through the metadata service. AWS then refuses any tag key outside letters, digits and + - = . , \_ : @, which rules out spaces and slashes. | `bool` | `false` | no |
 | tags | Tags applied to every resource this module creates. | `map(string)` | `{}` | no |
 
 ### Outputs

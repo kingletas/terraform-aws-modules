@@ -10,8 +10,12 @@ variable "launch_template_id" {
 
 variable "launch_template_version" {
   type        = string
-  description = "Version to launch. $Latest follows every template change; $Default follows the template's own default."
-  default     = "$Latest"
+  description = "Version number to launch, usually the launch-template module's latest_version output. A new number is what starts an instance refresh. $Latest and $Default are accepted only with instance_refresh set to null, because they never change and AWS refuses auto rollback with them."
+
+  validation {
+    condition     = can(regex("^([1-9][0-9]*|\\$Latest|\\$Default)$", var.launch_template_version))
+    error_message = "The launch_template_version must be a version number, $Latest or $Default."
+  }
 }
 
 variable "subnet_ids" {
@@ -100,9 +104,25 @@ variable "target_tracking_policies" {
     predefined       = optional(bool, true)
     resource_label   = optional(string)
     disable_scale_in = optional(bool, false)
+
+    customized_metric = optional(object({
+      metric_name = string
+      namespace   = string
+      statistic   = optional(string, "Average")
+      unit        = optional(string)
+      dimensions  = optional(map(string), {})
+    }))
   }))
-  description = "Target tracking scaling policies keyed by name. metric_type is a predefined metric such as ASGAverageCPUUtilization."
+  description = "Target tracking scaling policies keyed by name. A predefined policy names metric_type, such as ASGAverageCPUUtilization; a policy with predefined = false names customized_metric instead."
   default     = {}
+
+  validation {
+    condition = alltrue([
+      for name, policy in var.target_tracking_policies :
+      policy.predefined ? (policy.metric_type != null && policy.customized_metric == null) : (policy.customized_metric != null && policy.metric_type == null && policy.resource_label == null)
+    ])
+    error_message = "A predefined policy needs metric_type and no customized_metric. A policy with predefined = false needs customized_metric, and takes neither metric_type nor resource_label."
+  }
 }
 
 variable "warm_pool" {

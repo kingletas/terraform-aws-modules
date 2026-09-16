@@ -1,6 +1,16 @@
 locals {
   create_parameter_group = length(var.parameters) > 0
   failover_possible      = var.replicas_per_node_group > 0
+  cluster_mode           = var.num_node_groups > 1
+
+  # Sharding needs cluster-enabled, which the plain default parameter group turns off.
+  parameters = local.cluster_mode ? merge(var.parameters, { cluster-enabled = "yes" }) : var.parameters
+
+  parameter_group_name = (
+    local.create_parameter_group ? aws_elasticache_parameter_group.this[0].name :
+    local.cluster_mode ? format("default.%s.cluster.on", coalesce(var.parameter_group_family, "unset")) :
+    null
+  )
 
   tags = merge(var.tags, { Name = var.name })
 }
@@ -16,12 +26,13 @@ resource "aws_elasticache_subnet_group" "this" {
 resource "aws_elasticache_parameter_group" "this" {
   count = local.create_parameter_group ? 1 : 0
 
-  name        = format("%s-params", var.name)
+  # The family is in the name, because a family change replaces the group and create_before_destroy needs the new name to be free.
+  name        = format("%s-params-%s", var.name, replace(coalesce(var.parameter_group_family, "unset"), ".", "-"))
   family      = var.parameter_group_family
   description = format("Parameters for %s", var.name)
 
   dynamic "parameter" {
-    for_each = var.parameters
+    for_each = local.parameters
 
     content {
       name  = parameter.key
@@ -50,7 +61,7 @@ resource "aws_elasticache_replication_group" "this" {
 
   subnet_group_name    = aws_elasticache_subnet_group.this.name
   security_group_ids   = var.security_group_ids
-  parameter_group_name = local.create_parameter_group ? aws_elasticache_parameter_group.this[0].name : null
+  parameter_group_name = local.parameter_group_name
 
   automatic_failover_enabled = local.failover_possible && var.automatic_failover_enabled
   multi_az_enabled           = local.failover_possible && var.automatic_failover_enabled && var.multi_az_enabled
@@ -89,6 +100,11 @@ resource "aws_elasticache_replication_group" "this" {
     precondition {
       condition     = !local.create_parameter_group || var.parameter_group_family != null
       error_message = "Supplying parameters needs parameter_group_family, such as valkey8."
+    }
+
+    precondition {
+      condition     = !local.cluster_mode || var.parameter_group_family != null
+      error_message = "More than one node group needs parameter_group_family, such as valkey8, so the module can choose a parameter group with cluster-enabled on."
     }
   }
 }

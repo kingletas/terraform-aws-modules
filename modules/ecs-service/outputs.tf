@@ -1,11 +1,11 @@
 output "id" {
   description = "ID of the service."
-  value       = aws_ecs_service.this.id
+  value       = local.service.id
 }
 
 output "name" {
   description = "Name of the service."
-  value       = aws_ecs_service.this.name
+  value       = local.service.name
 }
 
 output "task_definition_arn" {
@@ -31,4 +31,15 @@ output "log_group_name" {
 output "autoscaling_target_resource_id" {
   description = "Application autoscaling resource ID, or null when autoscaling is off."
   value       = local.scaling == null ? null : aws_appautoscaling_target.this[0].resource_id
+}
+
+output "capacity_provider_strategy" {
+  description = "Capacity providers the service places tasks on, or an empty list when it uses a launch type."
+  value = [
+    for entry in local.service.capacity_provider_strategy : {
+      capacity_provider = entry.capacity_provider
+      weight            = entry.weight
+      base              = entry.base
+    }
+  ]
 }

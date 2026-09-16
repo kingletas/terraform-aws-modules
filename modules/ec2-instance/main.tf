@@ -17,6 +17,13 @@ locals {
   ]...)
 }
 
+# A volume takes its zone from the subnet, which outlives any one instance, so replacing an instance keeps the volume.
+data "aws_subnet" "volume" {
+  for_each = length(var.extra_volumes) > 0 ? local.instances : {}
+
+  id = each.value.subnet_id
+}
+
 resource "aws_instance" "this" {
   for_each = local.instances
 
@@ -51,20 +58,27 @@ resource "aws_instance" "this" {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
     http_put_response_hop_limit = 1
-    instance_metadata_tags      = "enabled"
+    instance_metadata_tags      = var.instance_metadata_tags ? "enabled" : "disabled"
   }
 
   tags = merge(var.tags, { Name = each.key })
 
+  # Destroy-first, so an extra volume is detached from the old instance before it is attached to the new one.
   lifecycle {
-    create_before_destroy = true
+    precondition {
+      condition = !var.instance_metadata_tags || alltrue([
+        for key in keys(merge(var.tags, { Name = "" })) :
+        can(regex("^[A-Za-z0-9+=.,_:@-]+$", key)) && !contains([".", "..", "_index"], key)
+      ])
+      error_message = "With instance_metadata_tags on, AWS refuses a tag key containing anything but letters, digits and + - = . , _ : @, or one that is ., .. or _index."
+    }
   }
 }
 
 resource "aws_ebs_volume" "this" {
   for_each = local.volume_attachments
 
-  availability_zone = aws_instance.this[each.value.instance_name].availability_zone
+  availability_zone = data.aws_subnet.volume[each.value.instance_name].availability_zone
   size              = var.extra_volumes[each.value.volume_name].size
   type              = var.extra_volumes[each.value.volume_name].type
   iops              = contains(["gp3", "io1", "io2"], var.extra_volumes[each.value.volume_name].type) ? var.extra_volumes[each.value.volume_name].iops : null

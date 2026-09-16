@@ -53,14 +53,14 @@ variable "associate_public_ip_address" {
 
 variable "root_volume" {
   type = object({
-    device_name           = optional(string, "/dev/xvda")
+    device_name           = optional(string)
     type                  = optional(string, "gp3")
     size                  = optional(number, 20)
     iops                  = optional(number)
     throughput            = optional(number)
     delete_on_termination = optional(bool, true)
   })
-  description = "Root volume settings. Always encrypted."
+  description = "Root volume settings. Always encrypted. device_name defaults to the AMI's own root device, which is /dev/xvda on Amazon Linux and /dev/sda1 on Ubuntu; a wrong name adds a second disk instead of configuring the root."
   default     = {}
 }
 
@@ -91,13 +91,12 @@ variable "detailed_monitoring" {
 
 variable "instance_requirements" {
   type = object({
-    vcpu_min          = number
-    vcpu_max          = number
-    memory_mib_min    = number
-    memory_mib_max    = number
-    cpu_architectures = optional(list(string), ["x86_64"])
+    vcpu_min       = number
+    vcpu_max       = number
+    memory_mib_min = number
+    memory_mib_max = number
   })
-  description = "Attribute-based instance selection, letting AWS pick any type that fits. Replaces instance_type when set."
+  description = "Attribute-based instance selection, letting AWS pick any type that fits. Replaces instance_type when set. The architecture follows the AMI."
   default     = null
 }
 
@@ -105,6 +104,12 @@ variable "capacity_reservation_preference" {
   type        = string
   description = "Whether instances may use an open capacity reservation."
   default     = "open"
+}
+
+variable "instance_metadata_tags" {
+  type        = bool
+  description = "Expose instance tags through the metadata service. AWS then refuses any tag key outside letters, digits and + - = . , _ : @, which rules out spaces and slashes."
+  default     = false
 }
 
 variable "tags" {

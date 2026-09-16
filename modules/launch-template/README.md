@@ -6,7 +6,7 @@ A launch template describing how an instance is built, for an autoscaling group 
 
 ```hcl
 module "app_template" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/launch-template?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/launch-template?ref=v0.3.0"
 
   name          = "platform-app"
   image_id      = data.aws_ami.amazon_linux.id
@@ -28,8 +28,10 @@ module "app_template" {
 
 ## Notes
 
+- **The root device name is read from the AMI**, because it differs between image families (`/dev/xvda` on Amazon Linux, `/dev/sda1` on Ubuntu) and a wrong name adds a second disk instead of configuring the root. Set `root_volume.device_name` only to override it. The identity running Terraform must be able to describe the image.
 - `user_data` is passed unencoded; the module base64-encodes it.
-- Setting `instance_requirements` lets AWS pick any instance type that fits, which is how you get spot capacity from a wide pool. It replaces `instance_type`.
+- Setting `instance_requirements` lets AWS pick any instance type that fits, which is how you get spot capacity from a wide pool. It replaces `instance_type`. The instance architecture follows the AMI, so choose an arm64 image for Graviton types.
+- `instance_metadata_tags` is off by default. Turn it on to read tags from the metadata service; AWS then refuses tag keys containing anything other than letters, digits and `+ - = . , _ : @`, and the plan checks this.
 - The template is created with `name_prefix` and `create_before_destroy`, so a change that forces replacement does not collide with the existing name.
 
 <!-- BEGIN_TF_DOCS -->
@@ -65,12 +67,13 @@ module "app_template" {
 | iam\_instance\_profile\_arn | IAM instance profile ARN. Needed for Session Manager and for anything calling AWS APIs. | `string` | `null` | no |
 | user\_data | Cloud-init user data, unencoded. The module base64-encodes it. | `string` | `null` | no |
 | associate\_public\_ip\_address | Give instances a public IP. Off by default. | `bool` | `false` | no |
-| root\_volume | Root volume settings. Always encrypted. | <pre>object({<br/>    device_name           = optional(string, "/dev/xvda")<br/>    type                  = optional(string, "gp3")<br/>    size                  = optional(number, 20)<br/>    iops                  = optional(number)<br/>    throughput            = optional(number)<br/>    delete_on_termination = optional(bool, true)<br/>  })</pre> | `{}` | no |
+| root\_volume | Root volume settings. Always encrypted. device\_name defaults to the AMI's own root device, which is /dev/xvda on Amazon Linux and /dev/sda1 on Ubuntu; a wrong name adds a second disk instead of configuring the root. | <pre>object({<br/>    device_name           = optional(string)<br/>    type                  = optional(string, "gp3")<br/>    size                  = optional(number, 20)<br/>    iops                  = optional(number)<br/>    throughput            = optional(number)<br/>    delete_on_termination = optional(bool, true)<br/>  })</pre> | `{}` | no |
 | extra\_volumes | Additional block devices keyed by a stable name. | <pre>map(object({<br/>    device_name           = string<br/>    size                  = number<br/>    type                  = optional(string, "gp3")<br/>    iops                  = optional(number)<br/>    throughput            = optional(number)<br/>    delete_on_termination = optional(bool, false)<br/>  }))</pre> | `{}` | no |
 | kms\_key\_id | KMS key for EBS encryption. Null uses the AWS-managed EBS key. | `string` | `null` | no |
 | detailed\_monitoring | Enable one-minute CloudWatch monitoring. | `bool` | `true` | no |
-| instance\_requirements | Attribute-based instance selection, letting AWS pick any type that fits. Replaces instance\_type when set. | <pre>object({<br/>    vcpu_min          = number<br/>    vcpu_max          = number<br/>    memory_mib_min    = number<br/>    memory_mib_max    = number<br/>    cpu_architectures = optional(list(string), ["x86_64"])<br/>  })</pre> | `null` | no |
+| instance\_requirements | Attribute-based instance selection, letting AWS pick any type that fits. Replaces instance\_type when set. The architecture follows the AMI. | <pre>object({<br/>    vcpu_min       = number<br/>    vcpu_max       = number<br/>    memory_mib_min = number<br/>    memory_mib_max = number<br/>  })</pre> | `null` | no |
 | capacity\_reservation\_preference | Whether instances may use an open capacity reservation. | `string` | `"open"` | no |
+| instance\_metadata\_tags | Expose instance tags through the metadata service. AWS then refuses any tag key outside letters, digits and + - = . , \_ : @, which rules out spaces and slashes. | `bool` | `false` | no |
 | tags | Tags applied to the template and to instances and volumes launched from it. | `map(string)` | `{}` | no |
 
 ### Outputs

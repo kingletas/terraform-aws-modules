@@ -6,7 +6,7 @@ A task definition and the service that runs it, with a deployment circuit breake
 
 ```hcl
 module "api" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/ecs-service?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/ecs-service?ref=v0.3.0"
 
   name        = "platform-api"
   cluster_arn = module.cluster.arn
@@ -48,7 +48,7 @@ module "api" {
 
 ## Two roles, and mixing them up is the usual first failure
 
-- **`execution_role_arn`** is what ECS itself uses, before your code runs, to pull the image and read the secrets. A container naming any `secrets` needs one, and the module refuses the plan without it.
+- **`execution_role_arn`** is what ECS itself uses, before your code runs, to pull the image, read the secrets and write to the log group. Every container logs through `awslogs`, which Fargate refuses without this role, so the module requires it.
 - **`task_role_arn`** is what your application code assumes at runtime.
 
 A missing execution role shows up as a task that never starts, with the reason buried in the stopped-task detail rather than in the logs.
@@ -57,8 +57,11 @@ A missing execution role shows up as a task that never starts, with the reason b
 
 - `secrets` maps an environment variable name to a Secrets Manager or SSM ARN. The value is fetched at start and never appears in the task definition.
 - The **deployment circuit breaker** stops a failing rollout and rolls back, instead of patiently replacing every healthy task with a broken one.
+- `capacity` chooses where tasks run, and ECS takes one form or the other. `{ launch_type = "FARGATE" }` is the default. For Fargate Spot, pass a strategy instead, for example `{ capacity_provider_strategy = [{ capacity_provider = "FARGATE", base = 1 }, { capacity_provider = "FARGATE_SPOT", weight = 3 }] }`. `base` is the number of tasks that stay on that provider, and only one provider may have one. The cluster must list every provider the strategy names.
+- `cpu_architecture` is `X86_64` by default. Set `ARM64` for Graviton, and build every container image for the architecture you choose.
 - `readonly_root_filesystem` defaults to true. An application that writes to disk needs a volume or an explicit false.
-- `desired_count` is in `ignore_changes`, so autoscaling owns it once the service is running.
+- With `autoscaling` set, `desired_count` is only the starting count and the scaler owns it afterwards. Without it, changing `desired_count` changes the running count.
+- The service with autoscaling and the service without it are separate resources in the module. **Adding or removing `autoscaling` on an existing service replaces the service**, so decide before the first apply or plan for the replacement.
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements
@@ -81,6 +84,7 @@ A missing execution role shows up as a task that never starts, with the reason b
 | [aws_appautoscaling_policy.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/appautoscaling_policy) | resource |
 | [aws_appautoscaling_target.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/appautoscaling_target) | resource |
 | [aws_cloudwatch_log_group.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_group) | resource |
+| [aws_ecs_service.autoscaled](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/ecs_service) | resource |
 | [aws_ecs_service.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/ecs_service) | resource |
 | [aws_ecs_task_definition.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/ecs_task_definition) | resource |
 
@@ -93,14 +97,15 @@ A missing execution role shows up as a task that never starts, with the reason b
 | containers | Containers keyed by container name. Secrets map an environment variable name to a Secrets Manager or SSM ARN. | <pre>map(object({<br/>    image      = string<br/>    cpu        = optional(number)<br/>    memory     = optional(number)<br/>    essential  = optional(bool, true)<br/>    command    = optional(list(string))<br/>    entrypoint = optional(list(string))<br/><br/>    ports = optional(list(object({<br/>      container_port = number<br/>      protocol       = optional(string, "tcp")<br/>      name           = optional(string)<br/>    })), [])<br/><br/>    environment = optional(map(string), {})<br/>    secrets     = optional(map(string), {})<br/><br/>    health_check_command  = optional(list(string))<br/>    health_check_interval = optional(number, 30)<br/>    health_check_retries  = optional(number, 3)<br/><br/>    readonly_root_filesystem = optional(bool, true)<br/>    user                     = optional(string)<br/>    depends_on_containers    = optional(map(string), {})<br/>  }))</pre> | n/a | yes |
 | cpu | Task-level CPU units. 1024 is one vCPU. | `number` | `512` | no |
 | memory | Task-level memory in mebibytes. Fargate accepts only certain pairings with cpu. | `number` | `1024` | no |
-| desired\_count | Tasks to run. Ignored after creation when autoscaling is configured. | `number` | `2` | no |
-| launch\_type | FARGATE or EC2. Null defers to the cluster's capacity provider strategy. | `string` | `"FARGATE"` | no |
+| cpu\_architecture | Processor architecture the task runs on, X86\_64 or ARM64. Every container image must be built for it. | `string` | `"X86_64"` | no |
+| desired\_count | Tasks to run. With autoscaling set it is only the starting count, and the scaler owns it afterwards. | `number` | `2` | no |
+| capacity | Where tasks run: a launch\_type (FARGATE or EC2), or a capacity\_provider\_strategy such as Fargate Spot above an on-demand base. ECS accepts one or the other, never both. | <pre>object({<br/>    launch_type = optional(string)<br/>    capacity_provider_strategy = optional(list(object({<br/>      capacity_provider = string<br/>      weight            = optional(number, 1)<br/>      base              = optional(number, 0)<br/>    })), [])<br/>  })</pre> | <pre>{<br/>  "launch_type": "FARGATE"<br/>}</pre> | no |
 | subnet\_ids | Subnets for the task network interfaces. Private subnets, with a NAT gateway or VPC endpoints for image pulls. | `list(string)` | n/a | yes |
 | security\_group\_ids | Security groups on the task network interfaces. | `list(string)` | `[]` | no |
 | assign\_public\_ip | Give tasks a public IP. Needed in a public subnet with no NAT gateway, and best avoided otherwise. | `bool` | `false` | no |
 | load\_balancers | Target groups to register tasks with, keyed by a stable name. | <pre>map(object({<br/>    target_group_arn = string<br/>    container_name   = string<br/>    container_port   = number<br/>  }))</pre> | `{}` | no |
 | task\_role\_arn | Role the application code assumes. Null means the container calls no AWS API. | `string` | `null` | no |
-| execution\_role\_arn | Role ECS itself uses to pull images and read secrets. Required when containers name any secrets. | `string` | `null` | no |
+| execution\_role\_arn | Role ECS itself uses to pull images, read secrets and write to the awslogs log group. Every container logs through awslogs, which Fargate refuses without this role. | `string` | n/a | yes |
 | log\_retention\_days | Days to keep container logs. | `number` | `365` | no |
 | kms\_key\_arn | KMS key encrypting the log group. | `string` | `null` | no |
 | enable\_execute\_command | Allow ECS Exec into a running task. Useful for debugging, and it is a shell into production. | `bool` | `false` | no |
@@ -120,4 +125,5 @@ A missing execution role shows up as a task that never starts, with the reason b
 | task\_definition\_revision | Revision number of the task definition. |
 | log\_group\_name | CloudWatch log group holding container logs. |
 | autoscaling\_target\_resource\_id | Application autoscaling resource ID, or null when autoscaling is off. |
+| capacity\_provider\_strategy | Capacity providers the service places tasks on, or an empty list when it uses a launch type. |
 <!-- END_TF_DOCS -->

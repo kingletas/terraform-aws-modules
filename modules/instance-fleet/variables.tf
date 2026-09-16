@@ -55,12 +55,11 @@ variable "roles" {
     user_data  = optional(string)
 
     extra_volumes = optional(map(object({
-      device_name           = string
-      size                  = number
-      type                  = optional(string, "gp3")
-      iops                  = optional(number)
-      throughput            = optional(number)
-      delete_on_termination = optional(bool, false)
+      device_name = string
+      size        = number
+      type        = optional(string, "gp3")
+      iops        = optional(number)
+      throughput  = optional(number)
     })), {})
 
     # Numbered by default, because a rename in Terraform is a destroy and a
@@ -97,6 +96,12 @@ variable "roles" {
     ])
     error_message = "Each role name must be 1-21 lowercase letters, digits or hyphens, starting with a letter."
   }
+}
+
+variable "instance_metadata_tags" {
+  type        = bool
+  description = "Expose instance tags through the metadata service. AWS then refuses any tag key outside letters, digits and + - = . , _ : @, which rules out spaces and slashes."
+  default     = false
 }
 
 variable "tags" {

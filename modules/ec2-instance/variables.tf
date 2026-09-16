@@ -98,14 +98,13 @@ variable "root_volume" {
 
 variable "extra_volumes" {
   type = map(object({
-    device_name           = string
-    size                  = number
-    type                  = optional(string, "gp3")
-    iops                  = optional(number)
-    throughput            = optional(number)
-    delete_on_termination = optional(bool, false)
+    device_name = string
+    size        = number
+    type        = optional(string, "gp3")
+    iops        = optional(number)
+    throughput  = optional(number)
   }))
-  description = "Additional EBS volumes attached to every instance, keyed by a stable name."
+  description = "Additional EBS volumes attached to every instance, keyed by a stable name. They are separate volumes, so they outlive the instance and are never deleted with it."
   default     = {}
 }
 
@@ -113,6 +112,12 @@ variable "kms_key_id" {
   type        = string
   description = "KMS key for EBS encryption. Defaults to the AWS-managed EBS key."
   default     = null
+}
+
+variable "instance_metadata_tags" {
+  type        = bool
+  description = "Expose instance tags through the metadata service. AWS then refuses any tag key outside letters, digits and + - = . , _ : @, which rules out spaces and slashes."
+  default     = false
 }
 
 variable "tags" {

@@ -28,7 +28,8 @@ locals {
       },
     ]
 
-    hostnames = ["tag:Name", "private-ip-address"]
+    # Instances in an autoscaling group share a Name tag, so only the instance ID tells them apart.
+    hostnames = ["instance-id"]
 
     compose = merge(
       {
@@ -40,16 +41,28 @@ locals {
         ansible_connection          = "'community.aws.aws_ssm'"
         ansible_aws_ssm_instance_id = "instance_id"
         ansible_aws_ssm_region      = "placement.region"
-        } : {
+      } : {},
+
+      var.connection == "ssm" && var.ssm_bucket_name != null ? {
+        ansible_aws_ssm_bucket_name = format("'%s'", var.ssm_bucket_name)
+      } : {},
+
+      var.connection == "ssh" ? {
         ansible_host = "private_ip_address"
-      },
+      } : {},
     )
 
     strict = false
   }
 
+  facts_lookup = length(var.facts) > 0 ? {
+    terraform_facts = format("{{ lookup('amazon.aws.aws_ssm', '%s', region='%s') | from_json }}", local.facts_path, var.regions[0])
+  } : {}
+
+  # The facts lookup joins the caller's own "all" variables, so one file holds both.
   group_var_files = {
-    for group, vars in var.group_vars : group => yamlencode(vars)
+    for group, vars in merge(length(local.facts_lookup) > 0 ? { all = tomap({}) } : {}, var.group_vars) :
+    group => yamlencode(group == "all" ? merge(vars, local.facts_lookup) : vars)
   }
 }
 
@@ -82,17 +95,4 @@ resource "aws_ssm_parameter" "facts" {
   value       = jsonencode(var.facts)
 
   tags = merge(var.tags, { Name = local.facts_path })
-}
-
-# A lookup so a playbook reads the facts without anyone passing a path around.
-resource "local_file" "facts_lookup" {
-  count = length(var.facts) > 0 ? 1 : 0
-
-  filename = format("%s/group_vars/all.yml", var.output_dir)
-
-  content = yamlencode({
-    terraform_facts = format("{{ lookup('amazon.aws.aws_ssm', '%s', region='%s') | from_json }}", local.facts_path, var.regions[0])
-  })
-
-  file_permission = "0644"
 }

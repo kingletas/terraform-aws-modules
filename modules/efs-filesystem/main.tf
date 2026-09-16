@@ -34,8 +34,27 @@ resource "aws_efs_mount_target" "this" {
   security_groups = var.security_group_ids
 }
 
-# Nothing outside the VPC may mount it, and everything that does must use TLS.
+# A file system policy replaces the default one, so it must allow mounting as well as requiring TLS.
 data "aws_iam_policy_document" "this" {
+  statement {
+    sid    = "AllowMountThroughMountTargets"
+    effect = "Allow"
+
+    actions   = var.allow_client_root_access ? ["elasticfilesystem:ClientMount", "elasticfilesystem:ClientWrite", "elasticfilesystem:ClientRootAccess"] : ["elasticfilesystem:ClientMount", "elasticfilesystem:ClientWrite"]
+    resources = [aws_efs_file_system.this.arn]
+
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "Bool"
+      variable = "elasticfilesystem:AccessedViaMountTarget"
+      values   = ["true"]
+    }
+  }
+
   statement {
     sid    = "EnforceTlsInTransit"
     effect = "Deny"

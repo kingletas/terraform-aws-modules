@@ -54,16 +54,69 @@ variable "memory" {
   default     = 1024
 }
 
+variable "cpu_architecture" {
+  type        = string
+  description = "Processor architecture the task runs on, X86_64 or ARM64. Every container image must be built for it."
+  default     = "X86_64"
+
+  validation {
+    condition     = contains(["X86_64", "ARM64"], var.cpu_architecture)
+    error_message = "cpu_architecture must be X86_64 or ARM64."
+  }
+}
+
 variable "desired_count" {
   type        = number
-  description = "Tasks to run. Ignored after creation when autoscaling is configured."
+  description = "Tasks to run. With autoscaling set it is only the starting count, and the scaler owns it afterwards."
   default     = 2
 }
 
-variable "launch_type" {
-  type        = string
-  description = "FARGATE or EC2. Null defers to the cluster's capacity provider strategy."
-  default     = "FARGATE"
+variable "capacity" {
+  type = object({
+    launch_type = optional(string)
+    capacity_provider_strategy = optional(list(object({
+      capacity_provider = string
+      weight            = optional(number, 1)
+      base              = optional(number, 0)
+    })), [])
+  })
+  description = "Where tasks run: a launch_type (FARGATE or EC2), or a capacity_provider_strategy such as Fargate Spot above an on-demand base. ECS accepts one or the other, never both."
+  default     = { launch_type = "FARGATE" }
+  nullable    = false
+
+  validation {
+    condition     = (var.capacity.launch_type == null) != (length(var.capacity.capacity_provider_strategy) == 0)
+    error_message = "Set exactly one of capacity.launch_type and capacity.capacity_provider_strategy."
+  }
+
+  validation {
+    condition     = contains(["FARGATE", "EC2"], coalesce(var.capacity.launch_type, "FARGATE"))
+    error_message = "capacity.launch_type must be FARGATE or EC2."
+  }
+
+  validation {
+    condition = alltrue([
+      for entry in var.capacity.capacity_provider_strategy :
+      entry.capacity_provider != "" && entry.weight >= 0 && entry.weight <= 1000 && entry.base >= 0 && entry.base <= 100000
+    ])
+    error_message = "Each capacity provider needs a name, a weight from 0 to 1000 and a base from 0 to 100000."
+  }
+
+  validation {
+    condition = length(var.capacity.capacity_provider_strategy) == 0 || (
+      length(distinct([for entry in var.capacity.capacity_provider_strategy : entry.capacity_provider])) == length(var.capacity.capacity_provider_strategy) &&
+      length([for entry in var.capacity.capacity_provider_strategy : entry if entry.base > 0]) <= 1 &&
+      anytrue([for entry in var.capacity.capacity_provider_strategy : entry.weight > 0])
+    )
+    error_message = "A capacity provider strategy names each provider once, gives a base to at most one of them, and needs a weight above 0 on at least one."
+  }
+
+  validation {
+    condition = length(distinct([
+      for entry in var.capacity.capacity_provider_strategy : contains(["FARGATE", "FARGATE_SPOT"], entry.capacity_provider)
+    ])) <= 1
+    error_message = "A capacity provider strategy cannot mix FARGATE or FARGATE_SPOT with an Auto Scaling group capacity provider."
+  }
 }
 
 variable "subnet_ids" {
@@ -106,8 +159,12 @@ variable "task_role_arn" {
 
 variable "execution_role_arn" {
   type        = string
-  description = "Role ECS itself uses to pull images and read secrets. Required when containers name any secrets."
-  default     = null
+  description = "Role ECS itself uses to pull images, read secrets and write to the awslogs log group. Every container logs through awslogs, which Fargate refuses without this role."
+
+  validation {
+    condition     = var.execution_role_arn != null && var.execution_role_arn != ""
+    error_message = "An execution_role_arn is required: every container logs through the awslogs driver, and Fargate refuses a task definition using awslogs without an execution role."
+  }
 }
 
 variable "log_retention_days" {
