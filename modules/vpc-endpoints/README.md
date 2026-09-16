@@ -6,7 +6,7 @@ Interface and gateway endpoints, so a private subnet reaches AWS services withou
 
 ```hcl
 module "endpoints" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/vpc-endpoints?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/vpc-endpoints?ref=v0.3.0"
 
   name   = "platform"
   vpc_id = module.vpc.vpc_id
@@ -24,7 +24,7 @@ module "endpoints" {
 
 The **S3 and DynamoDB gateway endpoints cost nothing** and remove the largest slice of NAT gateway data charges most stacks have. There is rarely a reason not to add them.
 
-An **interface endpoint is billed hourly per availability zone, plus per gigabyte**. Five services across three zones is fifteen hourly charges before any traffic. That can still beat a NAT gateway, or not — it depends on volume, and it is worth doing the arithmetic rather than assuming either way.
+An **interface endpoint is billed hourly per availability zone, plus per gigabyte**. Five services across three zones is fifteen hourly charges before any traffic. That can still beat a NAT gateway, or not. It depends on volume, and it is worth doing the arithmetic rather than assuming either way.
 
 ## Notes
 

@@ -6,14 +6,14 @@ An OpenID Connect provider in IAM, so a CI system gets short-lived AWS credentia
 
 ```hcl
 module "github" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/iam-oidc-provider?ref=v0.2.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/iam-oidc-provider?ref=v0.3.0"
 
   url        = "https://token.actions.githubusercontent.com"
   client_ids = ["sts.amazonaws.com"]
 }
 
 module "deploy_role" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/iam-role?ref=v0.2.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/iam-role?ref=v0.3.0"
 
   name = "github-deploy"
 
@@ -39,12 +39,11 @@ The audience alone is not a restriction worth having. Every GitHub Actions workf
 
 | `subjects` | Who can assume the role |
 |---|---|
-| not set | Anyone, on any repository, on any branch |
 | `repo:your-org/*` | Anyone in your organization, including a fork opened as a pull request |
 | `repo:your-org/your-repo:ref:refs/heads/main` | That repository, on that branch |
 | `repo:your-org/your-repo:environment:production` | That repository, in an environment with its own approvers |
 
-The last two are the ones to reach for. An environment is the stronger of them, because GitHub can require a human approval before the job that assumes the role ever starts.
+[`iam-role`](../iam-role) refuses a trust with no `subjects`, a subject made only of wildcards, and a GitHub subject that does not start with `repo:<owner>/` and a literal owner, so the audience-only trust and `repo:*` cannot be planned. The last two rows are the ones to reach for. An environment is the stronger of them, because GitHub can require a human approval before the job that assumes the role ever starts.
 
 `audience_key` and `subject_key` are outputs rather than something you write, so the issuer host is stated once and the trust policy cannot disagree with the provider it names.
 

@@ -6,7 +6,7 @@ A container registry with immutable tags and a lifecycle policy, so old images d
 
 ```hcl
 module "api_image" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/ecr-repository?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/ecr-repository?ref=v0.3.0"
 
   name                       = "platform/api"
   untagged_image_expiry_days = 7
@@ -23,7 +23,7 @@ This does mean a build cannot overwrite `latest`. Push a digest or a build-speci
 ## Notes
 
 - `scan_on_push` reports known vulnerabilities in the image. It does not block the push.
-- The lifecycle policy runs asynchronously — expired images disappear within a day or so, not immediately.
+- The lifecycle policy runs asynchronously: expired images disappear within a day or so, not immediately.
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements

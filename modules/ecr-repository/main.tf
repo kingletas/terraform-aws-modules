@@ -1,6 +1,6 @@
 locals {
   # Each rule is encoded on its own. The two rules have different shapes, and any
-  # step that makes them share a type — a conditional, merge or concat — either
+  # step that makes them share a type (a conditional, merge or concat) either
   # fails to evaluate or turns countNumber into a string the ECR API rejects.
   untagged_rule = var.untagged_image_expiry_days > 0 ? [jsonencode({
     rulePriority = 1

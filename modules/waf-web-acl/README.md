@@ -6,7 +6,7 @@ A WAF web ACL with AWS managed rule groups, rate limits and IP lists, logging wi
 
 ```hcl
 module "waf" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/waf-web-acl?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/waf-web-acl?ref=v0.3.0"
 
   name  = "platform-public"
   scope = "REGIONAL"
@@ -24,14 +24,14 @@ module "waf" {
     }
   }
 
-  log_destination_arns     = [aws_cloudwatch_log_group.waf.arn]
-  associations = { alb = module.alb.arn }
+  log_destination_arns = [aws_cloudwatch_log_group.waf.arn]
+  associations         = { alb = module.alb.arn }
 }
 ```
 
 ## Start in count mode
 
-`count_only = true` records what a rule group *would* have blocked without blocking anything. The common rule set has real false positives against ordinary applications — file uploads and rich text bodies trip it regularly.
+`count_only = true` records what a rule group *would* have blocked without blocking anything. The common rule set has real false positives against ordinary applications: file uploads and rich text bodies trip it regularly.
 
 Deploy in count mode, read the sampled requests for a week, then enforce. Enforcing first means finding out from your users.
 

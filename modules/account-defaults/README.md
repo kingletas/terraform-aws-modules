@@ -2,18 +2,20 @@
 
 Account and region-wide settings that apply above whatever an individual resource asks for.
 
-Applied once per account and region, not per stack.
+Apply it once per account and region, not once per stack.
 
 ## Usage
 
 ```hcl
 module "account_defaults" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/account-defaults?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/account-defaults?ref=v0.3.0"
 
   ebs_encryption_by_default = true
   block_s3_public_access    = true
 
-  default_security_group_vpc_ids = [module.vpc.vpc_id]
+  default_security_group_vpc_ids = {
+    platform = module.vpc.vpc_id
+  }
 }
 ```
 
@@ -21,21 +23,22 @@ module "account_defaults" {
 
 Each closes a gap that a per-resource setting cannot:
 
-- **EBS encryption by default** covers a volume created in the console, by an autoscaling group somebody wrote by hand, or by any Terraform that forgot. It is regional and it does not touch existing volumes.
-- **The S3 account public access block** sits above every bucket's own block. A bucket policy cannot open a bucket while it stands, whoever writes the policy.
-- **The IAM password policy** applies to console users, which are the accounts nobody remembers to check.
-- **The default security group** of a VPC permits all traffic between its members and cannot be deleted. Adopting it and giving it no rules is the only way to make it harmless — and it matters for a VPC created outside this library, whose default is otherwise still open.
+- **EBS encryption by default** covers a volume created in the console, by a hand-written autoscaling group, or by any Terraform that did not ask for encryption. It is regional and it does not touch existing volumes.
+- **The S3 account public access block** sits above every bucket's own block. While it is on, no bucket policy can make a bucket public.
+- **The IAM password policy** applies to console users, which are the accounts most often left unchecked.
+- **The default security group** of a VPC permits all traffic between its members and cannot be deleted. Adopting it and giving it no rules is the only way to make it harmless. This matters most for a VPC created outside this library, whose default group is otherwise still open.
 
-## Password expiry is off, deliberately
+## Password expiry is off by default
 
-`max_age_days` defaults to 0, meaning no expiry. Forced rotation makes people pick worse passwords and append a number, and NIST stopped recommending it years ago. Length and a second factor do the work instead, which is why the minimum here is 14 rather than 8.
+`max_age_days` defaults to 0, meaning no expiry. Forced rotation leads people to pick weaker passwords, and NIST guidance does not recommend it. Length and a second factor do the work instead, which is why the minimum length here is 14 rather than 8.
 
-Set it if a compliance regime demands it. It is a compliance answer rather than a security one.
+Set `max_age_days` if a compliance regime requires expiry.
 
 ## Notes
 
-- **These are account-wide.** Applying this module from two stacks in the same account means two Terraform states both claiming the same settings, and they will fight. Apply it once, from a baseline stack.
-- `aws_ebs_encryption_by_default` has no "off" that removes it — setting `false` explicitly disables encryption by default, which is a change worth being deliberate about.
+- **These settings are account-wide.** Applying this module from two stacks in the same account gives two Terraform states that both manage the same settings, and each apply undoes the other. Apply it once, from a baseline stack.
+- `ebs_encryption_by_default = false` does not simply stop managing the setting: it explicitly turns encryption by default off for the region.
+- `password_policy = null` leaves the account's own password policy untouched.
 - The default security group is **adopted**, not created. Terraform takes over a resource that already exists, and removing this module from the configuration leaves the group empty rather than restoring its original rules.
 
 <!-- BEGIN_TF_DOCS -->

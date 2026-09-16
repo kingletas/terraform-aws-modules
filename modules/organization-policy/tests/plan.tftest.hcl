@@ -32,7 +32,7 @@ run "plans_with_real_values" {
   }
 }
 
-# The quiet direction above proves nothing about the loud one.
+# Refusal tests: each run below must fail the plan.
 run "refuses_content_that_is_not_json" {
   command = plan
 

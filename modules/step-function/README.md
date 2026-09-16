@@ -6,7 +6,7 @@ A state machine with logging and X-Ray tracing, for orchestrating work that a si
 
 ```hcl
 module "order_flow" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/step-function?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/step-function?ref=v0.3.0"
 
   name     = "order-fulfilment"
   role_arn = module.order_flow_role.arn
@@ -40,7 +40,7 @@ Choose EXPRESS for high-volume short work, and set `log_level = "ALL"` when you 
 
 ## Notes
 
-- `include_execution_data` writes state input and output to CloudWatch. Convenient, and it puts your payloads — including anything sensitive passing between states — into logs.
+- `include_execution_data` writes state input and output to CloudWatch. Convenient, and it puts your payloads, including anything sensitive passing between states, into logs.
 - The role needs permission for everything the states invoke, and for X-Ray if tracing is on.
 
 <!-- BEGIN_TF_DOCS -->

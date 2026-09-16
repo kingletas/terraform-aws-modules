@@ -6,7 +6,7 @@ A peering connection between two VPCs, with the routes that make it usable.
 
 ```hcl
 module "peering" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/vpc-peering?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/vpc-peering?ref=v0.3.0"
 
   name             = "platform-to-data"
   requester_vpc_id = module.platform_vpc.vpc_id

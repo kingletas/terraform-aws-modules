@@ -8,7 +8,7 @@ Registering an existing key, which is the better path:
 
 ```hcl
 module "ssh_key" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/ssh-key-pair?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/ssh-key-pair?ref=v0.3.0"
 
   name       = "storefront-production"
   public_key = file("~/.ssh/id_ed25519.pub")
@@ -19,7 +19,7 @@ Generating one, where nobody has a key to hand:
 
 ```hcl
 module "ssh_key" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/ssh-key-pair?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/ssh-key-pair?ref=v0.3.0"
 
   name        = "storefront-staging"
   kms_key_arn = module.kms.arn
@@ -29,7 +29,7 @@ module "ssh_key" {
 ```
 
 > [!warning] A generated private key is in Terraform state, in clear text
-> That is unavoidable — Terraform records what it created — and it is why supplying a public key is preferred for anything long-lived. Whoever can read the state file can read the key.
+> That is unavoidable, because Terraform records what it created, and it is why supplying a public key is preferred for anything long-lived. Whoever can read the state file can read the key.
 >
 > `write_private_key_to` additionally puts it on the disk of whoever ran the apply, at mode 0600. It is off by default. `store_in_secrets_manager` is on instead, so a CI job or a second operator can fetch it without it being emailed around.
 
@@ -37,7 +37,7 @@ module "ssh_key" {
 
 - **ED25519 by default.** Smaller and faster than RSA, and supported everywhere that matters now. Older tooling that cannot read it needs `algorithm = "RSA"`.
 - `recovery_window_in_days` defaults to 7. A secret pending deletion holds its name, so a short window matters when you are recreating a stack repeatedly.
-- `was_generated` is exported so a caller can branch on it — for instance, only wiring the secret ARN into an IAM policy when there is one.
+- `was_generated` is exported so a caller can branch on it: for instance, only wiring the secret ARN into an IAM policy when there is one.
 - Prefer Systems Manager Session Manager over SSH entirely where you can. This module exists for the cases where you cannot: a bastion, a database tunnel, or an AMI without the agent.
 
 <!-- BEGIN_TF_DOCS -->

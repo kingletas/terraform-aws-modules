@@ -54,7 +54,7 @@ run "plans_an_http_endpoint_stream" {
   }
 }
 
-# The quiet direction above proves nothing about the loud one.
+# Refusal tests: each run below must fail the plan.
 run "refuses_no_destination" {
   command = plan
 

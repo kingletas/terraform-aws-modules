@@ -6,7 +6,7 @@ A hosted zone with its records and health checks, public or private.
 
 ```hcl
 module "zone" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/route53-zone?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/route53-zone?ref=v0.3.0"
 
   name = "example.com"
 
@@ -29,7 +29,7 @@ module "zone" {
 
 ## Alias records, not CNAMEs
 
-An alias points at an AWS resource, resolves for free, and **can sit at the zone apex** — which a CNAME cannot, because DNS forbids a CNAME alongside the SOA and NS records that must exist there.
+An alias points at an AWS resource, resolves for free, and **can sit at the zone apex**. A CNAME cannot, because DNS forbids a CNAME alongside the SOA and NS records that must exist there.
 
 Aliases also follow the target. When a load balancer's addresses change, the alias is already correct.
 

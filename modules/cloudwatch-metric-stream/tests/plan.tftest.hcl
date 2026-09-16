@@ -41,7 +41,7 @@ run "plans_an_exclude_list" {
   }
 }
 
-# The quiet direction above proves nothing about the loud one.
+# Refusal tests: each run below must fail the plan.
 run "refuses_an_include_and_an_exclude_together" {
   command = plan
 

@@ -6,7 +6,7 @@ A MongoDB-compatible cluster, encrypted, with TLS and audit logging on by defaul
 
 ```hcl
 module "documents" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/documentdb-cluster?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/documentdb-cluster?ref=v0.3.0"
 
   name           = "platform-docs"
   instance_count = 2
@@ -20,7 +20,7 @@ module "documents" {
 ## Notes
 
 - **DocumentDB is MongoDB-compatible, not MongoDB.** Compatibility is by API version, and drivers sometimes use commands it does not implement. Check the supported operations before porting an application.
-- `tls = enabled` is set by default in `parameters`, so clients need the Amazon RDS certificate bundle. Turning it off is a parameter change and a cluster reboot.
+- `parameters` defaults to `tls = enabled` and `audit_logs = enabled`, so clients need the Amazon RDS certificate bundle. Setting `parameters` replaces that whole map, so include both keys in your own map to keep them. Turning TLS off is a parameter change and a cluster reboot.
 - The first instance is the writer. Reads go to `reader_endpoint`.
 
 <!-- BEGIN_TF_DOCS -->

@@ -6,7 +6,7 @@ An Aurora cluster with a writer and readers, defaulting to Serverless v2 capacit
 
 ```hcl
 module "database" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/aurora-cluster?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/aurora-cluster?ref=v0.3.0"
 
   name           = "platform"
   engine         = "aurora-postgresql"
@@ -27,15 +27,15 @@ module "database" {
 }
 ```
 
-## Two endpoints, and using the wrong one is a common fault
+## Send reads to the reader endpoint
 
-`endpoint` is the writer. `reader_endpoint` load balances across every reader. An application that sends reads to the writer gets correct answers and no benefit from its readers at all — nothing errors, the bill just does not buy anything.
+`endpoint` is the writer. `reader_endpoint` load balances across every reader. An application that sends reads to the writer gets correct answers and no benefit from its readers. Nothing errors; you pay for readers that do no work.
 
 ## Notes
 
-- **Serverless v2 is `engine_mode = "provisioned"` with instance class `db.serverless`.** The old `serverless` engine mode is v1, which is a different and largely superseded product.
+- **Serverless v2 is `engine_mode = "provisioned"` with instance class `db.serverless`.** The old `serverless` engine mode is v1, which is a different product.
 - `promotion_tier` decides who is promoted on failover. Lower wins.
-- Aurora storage grows automatically and is billed for what is used; there is no `allocated_storage` to set.
+- Aurora storage grows automatically and is billed for what is used. There is no `allocated_storage` to set.
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements

@@ -6,7 +6,7 @@ A log group with retention, plus the metric and subscription filters that make i
 
 ```hcl
 module "app_logs" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/cloudwatch-log-group?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/cloudwatch-log-group?ref=v0.3.0"
 
   name           = "/platform/api"
   retention_days = 90
@@ -27,13 +27,13 @@ module "app_logs" {
 
 CloudWatch cannot alarm on log text. A metric filter counts matching lines into a metric, and that metric is what an alarm watches.
 
-**Set `default_value = 0`.** Without it, the filter publishes nothing when there are no matches, so the metric has gaps rather than zeroes — and an alarm over a gap depends entirely on `treat_missing_data`, which is a subtlety nobody wants in the path of an error alert.
+**Set `default_value = 0`.** Without it, the filter publishes nothing when there are no matches, so the metric has gaps rather than zeroes. An alarm over a gap then depends entirely on `treat_missing_data`, which is easy to get wrong on an error alert.
 
 ## Notes
 
-- `retention_days = 0` keeps logs forever. That is a bill that only grows, and it is the default AWS gives a group nobody configured.
-- Encrypting with a key needs `logs.<region>.amazonaws.com` in that key's policy, or the group cannot be created and the error does not mention the key.
-- `INFREQUENT_ACCESS` is cheaper and supports far less — no metric filters, no Live Tail, limited Insights.
+- `retention_days = 0` keeps logs forever. Storage cost then only grows. The module defaults to 365 days.
+- Encrypting with a key needs `logs.<region>.amazonaws.com` in that key's policy, or the group cannot be created, and the error does not mention the key.
+- `INFREQUENT_ACCESS` is cheaper and supports far less: no metric filters, no Live Tail, and limited Logs Insights queries.
 - `skip_destroy` keeps the logs when Terraform removes the group.
 
 <!-- BEGIN_TF_DOCS -->

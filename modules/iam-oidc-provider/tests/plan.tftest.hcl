@@ -25,7 +25,7 @@ run "plans_with_real_values" {
   }
 }
 
-# The quiet direction above proves nothing about the loud one.
+# Refusal tests: each run below must fail the plan.
 run "refuses_a_trailing_slash" {
   command = plan
 

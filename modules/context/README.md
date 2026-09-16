@@ -2,13 +2,13 @@
 
 One place that decides names, tags and every environment-dependent default, so no other module has to ask which environment it is in.
 
-This module creates nothing. It is a calculation, and that is the point — every stack that uses it agrees on what a production database looks like without repeating the decision.
+This module creates no resources. It only computes values, so every stack that uses it agrees on what a production database looks like without repeating the decision.
 
 ## Usage
 
 ```hcl
 module "context" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/context?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/context?ref=v0.3.0"
 
   project     = "storefront"
   environment = "production"
@@ -17,9 +17,11 @@ module "context" {
 }
 
 module "database" {
-  source = "../../modules/aurora-cluster"
+  source = "github.com/kingletas/terraform-aws-modules//modules/aurora-cluster?ref=v0.3.0"
 
-  name                    = module.context.prefix
+  name       = module.context.prefix
+  subnet_ids = values(module.vpc.private_subnet_ids)
+
   backup_retention_period = module.context.defaults.backup_retention_days
   deletion_protection     = module.context.defaults.deletion_protection
   skip_final_snapshot     = module.context.defaults.skip_final_snapshot
@@ -29,7 +31,7 @@ module "database" {
 
 ## What `defaults` decides
 
-The reference implementations this replaces carried `var.instance_types[var.environment]` in every stack, and each stack made its own decision about retention, multi-AZ and deletion protection. Here it is one table:
+Without a shared table, each stack carries its own environment-to-setting map and makes its own decision about retention, multi-AZ and deletion protection. Here it is one table:
 
 | | dev | staging | uat | production |
 |---|---|---|---|---|
@@ -41,22 +43,25 @@ The reference implementations this replaces carried `var.instance_types[var.envi
 | `single_nat_gateway` | yes | yes | yes | **no** |
 | `min` / `desired` / `max` capacity | 1 / 1 / 2 | 1 / 2 / 4 | 2 / 2 / 4 | **2 / 3 / 12** |
 
-A stack reads these rather than writing another conditional. Where a stack genuinely differs, it overrides that one value and the difference is visible in the diff.
+A stack reads these rather than writing another conditional. Where a stack genuinely differs, it sets that one value itself, and the difference is visible in the code.
 
-## Three name shapes, because AWS is not consistent
+## Three name shapes
 
-- **`prefix`** — `project-environment-component`. What most resources take.
-- **`short_prefix`** — the same truncated to 24 characters, for a load balancer or an OpenSearch domain where AWS caps the name and a module appends a suffix.
-- **`compact_prefix`** — hyphens removed, for a CloudWatch metric namespace and anything else that rejects them.
+AWS naming rules differ between services, so the module exports three forms of the same name:
 
-Working these out separately in each stack is how two resources for the same thing end up with names that do not match.
+- **`prefix`**: `project-environment-component` (the component is left out when not set). Most resources take this.
+- **`short_prefix`**: the prefix truncated to 24 characters, for a load balancer or an OpenSearch domain, where AWS caps the name and a module appends a suffix.
+- **`compact_prefix`**: the prefix with hyphens removed, for names that reject hyphens.
+
+Computing these once keeps names for the same thing consistent across stacks.
 
 ## Notes
 
-- **Production gets `Backup = true` automatically.** A tag-selected backup plan then covers production and nothing else, with no environment logic in the plan.
-- `is_production` exists so callers stop comparing the environment string themselves. One place to change if a fifth environment appears.
-- `name` is a small map of common suffixes — `name["alb"]`, `name["bastion"]` — for the resources every stack has.
-- The environment list is validated. A typo becomes a plan error rather than a stack named `storefront-produciton`.
+- **Production gets the tag `Backup = true` automatically.** A tag-selected backup plan then covers production and nothing else, with no environment logic in the plan.
+- Use `is_production` rather than comparing the environment string in each stack.
+- `name` maps a few common suffixes to full names, such as `name["alb"]` and `name["bastion"]`. The suffixes are `vpc`, `alb`, `web`, `app`, `data`, `cache`, `search`, `queue`, `bastion`, `cron`, `admin` and `builder`.
+- `environment` must be `dev`, `staging`, `uat` or `production`, so a typo is a plan error rather than a stack named `storefront-produciton`.
+- `extra_tags` is merged last, so a key there overrides a generated tag.
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements

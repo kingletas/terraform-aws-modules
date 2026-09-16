@@ -6,7 +6,7 @@ Pushes CloudWatch metrics to a delivery stream as they arrive, instead of someth
 
 ```hcl
 module "metric_stream" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/cloudwatch-metric-stream?ref=v0.2.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/cloudwatch-metric-stream?ref=v0.3.0"
 
   name         = "to-vendor"
   role_arn     = module.metric_stream_role.arn
@@ -33,27 +33,27 @@ The usual way a monitoring vendor reads CloudWatch is to call `GetMetricData` on
 
 A metric stream pushes instead. Metrics arrive within a couple of minutes of being published, the cost moves from API calls to a charge per metric update, and the vendor stops needing broad read permissions across the account.
 
-The change is not free in either direction. Polling is cheap when you watch few metrics; streaming is cheaper and faster when you watch many. **Which side you are on is decided by the filters below**, so they are worth setting deliberately rather than streaming everything and finding out on the bill.
+Polling is cheaper when you watch few metrics. Streaming is cheaper and faster when you watch many. **The filters below decide which side you are on**, so set them deliberately rather than streaming everything and finding out on the bill.
 
 ## An include list or an exclude list, never both
 
 `include_namespaces` streams only what it names. `exclude_namespaces` streams everything except what it names. AWS accepts one or the other, and the module refuses both at plan.
 
-Prefer the include list. An exclude list means every namespace AWS adds in future starts streaming, and being charged for, without anyone deciding.
+Prefer the include list. With an exclude list, every namespace AWS adds later starts streaming, and being charged for, without anyone deciding. With neither list set, the stream carries every namespace.
 
-An empty list against a namespace means every metric in it. A populated one names the metrics, which is how a busy namespace like `AWS/ApplicationELB` or `AWS/Usage` is kept to the handful anybody reads.
+An empty list against a namespace means every metric in it. A populated one names the metrics, which keeps a busy namespace like `AWS/ApplicationELB` or `AWS/Usage` to the metrics you actually read.
 
 ## Percentiles are charged per statistic
 
 A stream carries the four default statistics with no extra charge: minimum, maximum, sum and sample count. Anything else, `p95` and `p99` included, is billed per additional statistic per metric.
 
-That is why `statistics_configurations` names individual metrics rather than namespaces. A `p99` on the one latency metric that matters costs almost nothing. A `p99` across a namespace costs it on every metric in it, including the ones nobody has ever charted.
+That is why `statistics_configurations` names individual metrics rather than namespaces. A `p99` on the one latency metric that matters costs almost nothing. A `p99` across a namespace costs it on every metric in it, including the ones nobody reads.
 
 ## Notes
 
-- **The role is yours to build.** CloudWatch assumes it to write to the delivery stream, and it needs `firehose:PutRecord` and `firehose:PutRecordBatch` on that stream alone. [`iam-role`](../iam-role) with `streams.metrics.cloudwatch.amazonaws.com` trusted.
+- **The role is yours to build.** CloudWatch assumes it to write to the delivery stream, and it needs `firehose:PutRecord` and `firehose:PutRecordBatch` on that stream alone. The [`iam-role`](../iam-role) module builds it with `streams.metrics.cloudwatch.amazonaws.com` in `trusted_services`.
 - **A stream is per region.** Metrics from another region need a stream there too, and a delivery stream there to write to.
-- `output_format` defaults to `json` because most vendors accept it. The OpenTelemetry formats are smaller on the wire and carry resource attributes; check what the far end parses before switching.
+- `output_format` defaults to `json` because most vendors accept it. The OpenTelemetry formats are smaller on the wire and carry resource attributes; check what the receiving service parses before switching.
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements
