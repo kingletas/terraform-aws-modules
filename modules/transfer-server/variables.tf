@@ -74,8 +74,15 @@ variable "users" {
     posix_uid      = optional(number)
     posix_gid      = optional(number)
   }))
-  description = "Users keyed by username. Each is confined to its own prefix in the bucket and cannot see anything above it."
+  description = "Users keyed by username. Each is confined to its home directory in the bucket, which defaults to a prefix named after the user, and cannot see anything above it."
   default     = {}
+
+  validation {
+    condition = alltrue([
+      for username, user in var.users : user.home_directory == null || (trim(coalesce(user.home_directory, "-"), "/") != "" && !strcontains(coalesce(user.home_directory, "-"), ".."))
+    ])
+    error_message = "A home_directory must name a prefix below the bucket root and cannot contain \"..\"."
+  }
 }
 
 variable "log_retention_days" {
@@ -92,6 +99,14 @@ variable "log_retention_days" {
 variable "kms_key_arn" {
   type        = string
   description = "KMS key encrypting the log group."
+  default     = null
+}
+
+variable "bucket_kms_key" {
+  type = object({
+    arn = string
+  })
+  description = "Customer-managed KMS key encrypting the bucket. Users are granted kms:Decrypt, and kms:GenerateDataKey when they can write, through S3 only. Null for a bucket using S3-managed keys."
   default     = null
 }
 

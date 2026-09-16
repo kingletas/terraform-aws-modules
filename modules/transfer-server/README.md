@@ -6,7 +6,7 @@ A managed SFTP server over an S3 bucket, with each user confined to its own pref
 
 ```hcl
 module "sftp" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/transfer-server?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/transfer-server?ref=v0.3.0"
 
   name        = "platform-sftp"
   bucket_name = module.exchange.id
@@ -25,13 +25,15 @@ module "sftp" {
 
 ## Each user sees only its own directory
 
-Every user gets its own IAM role and a logical home directory mapped to `s3://<bucket>/<username>`. The policy allows `ListBucket` only under that prefix, so a partner cannot list the bucket root or read another partner's files — and because the home directory is logical, they cannot navigate above it either.
+Every user gets its own IAM role and a logical home directory. It maps to `s3://<bucket>/<username>`, or to `s3://<bucket>/<home_directory>` when the user sets `home_directory`. The user's policy allows access only under that prefix, so a partner cannot list the bucket root or read another partner's files. Because the home directory is logical, they cannot navigate above it either.
 
 ## Notes
 
 - **Public keys only.** Service-managed identity has no password authentication, which is the right answer for a partner integration.
 - **Plain `FTP` is unencrypted** and should never be in `protocols` on a public endpoint. `FTPS` needs a certificate.
 - `address_allocation_ids` gives the server fixed Elastic IPs, which is what a partner's firewall team will ask for. It needs `endpoint_type = "VPC"`.
+- `home_directory` must name a prefix below the bucket root and cannot contain `..`. The plan fails otherwise.
+- A bucket encrypted with a customer-managed key needs `bucket_kms_key = { arn = ... }`, or every read and write is denied. Each user is granted `kms:Decrypt`, plus `kms:GenerateDataKey` unless `read_only` is set, and only through S3. The key policy must also allow the account to delegate key use to IAM.
 - The server is billed hourly from creation, whether anyone connects or not, plus per gigabyte transferred.
 
 <!-- BEGIN_TF_DOCS -->
@@ -75,9 +77,10 @@ Every user gets its own IAM role and a logical home directory mapped to `s3://<b
 | certificate\_arn | ACM certificate. Required when FTPS is in the protocol list. | `string` | `null` | no |
 | security\_policy\_name | Cryptographic policy governing which ciphers and key exchanges are offered. | `string` | `"TransferSecurityPolicy-2025-03"` | no |
 | bucket\_name | S3 bucket users are given access to. | `string` | n/a | yes |
-| users | Users keyed by username. Each is confined to its own prefix in the bucket and cannot see anything above it. | <pre>map(object({<br/>    public_keys    = list(string)<br/>    home_directory = optional(string)<br/>    read_only      = optional(bool, false)<br/>    posix_uid      = optional(number)<br/>    posix_gid      = optional(number)<br/>  }))</pre> | `{}` | no |
+| users | Users keyed by username. Each is confined to its home directory in the bucket, which defaults to a prefix named after the user, and cannot see anything above it. | <pre>map(object({<br/>    public_keys    = list(string)<br/>    home_directory = optional(string)<br/>    read_only      = optional(bool, false)<br/>    posix_uid      = optional(number)<br/>    posix_gid      = optional(number)<br/>  }))</pre> | `{}` | no |
 | log\_retention\_days | Days to keep transfer logs. These are the record of who moved which file. | `number` | `365` | no |
 | kms\_key\_arn | KMS key encrypting the log group. | `string` | `null` | no |
+| bucket\_kms\_key | Customer-managed KMS key encrypting the bucket. Users are granted kms:Decrypt, and kms:GenerateDataKey when they can write, through S3 only. Null for a bucket using S3-managed keys. | <pre>object({<br/>    arn = string<br/>  })</pre> | `null` | no |
 | tags | Tags applied to every resource this module creates. | `map(string)` | `{}` | no |
 
 ### Outputs

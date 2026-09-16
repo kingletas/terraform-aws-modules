@@ -1,10 +1,18 @@
 locals {
-  symmetric = var.customer_master_key_spec == "SYMMETRIC_DEFAULT"
-  tags      = merge(var.tags, { Name = var.name })
+  symmetric  = var.customer_master_key_spec == "SYMMETRIC_DEFAULT"
+  add_caller = var.include_caller_as_admin && length(var.admin_arns) > 0
+  tags       = merge(var.tags, { Name = var.name })
 }
 
 data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
+
+# Resolves an assumed-role session to its role, which is what a key policy can name stably.
+data "aws_iam_session_context" "caller" {
+  count = local.add_caller ? 1 : 0
+
+  arn = data.aws_caller_identity.current.arn
+}
 
 # Without an explicit policy a key falls back to one granting account root everything.
 data "aws_iam_policy_document" "this" {
@@ -16,9 +24,9 @@ data "aws_iam_policy_document" "this" {
 
     principals {
       type = "AWS"
-      identifiers = length(var.admin_arns) > 0 ? var.admin_arns : [
+      identifiers = length(var.admin_arns) == 0 ? [
         format("arn:%s:iam::%s:root", data.aws_partition.current.partition, data.aws_caller_identity.current.account_id)
-      ]
+      ] : distinct(concat(var.admin_arns, local.add_caller ? [data.aws_iam_session_context.caller[0].issuer_arn] : []))
     }
   }
 
@@ -66,6 +74,36 @@ data "aws_iam_policy_document" "this" {
       principals {
         type        = "Service"
         identifiers = var.service_principals
+      }
+
+      # IfExists keeps use working for a service that does not send its source account.
+      condition {
+        test     = "StringEqualsIfExists"
+        variable = "aws:SourceAccount"
+        values   = [data.aws_caller_identity.current.account_id]
+      }
+    }
+  }
+
+  dynamic "statement" {
+    for_each = length(var.delivery_service_principals) > 0 ? [1] : []
+
+    content {
+      sid       = "AllowDeliveryServices"
+      effect    = "Allow"
+      actions   = ["kms:Decrypt", "kms:GenerateDataKey*"]
+      resources = ["*"]
+
+      principals {
+        type        = "Service"
+        identifiers = var.delivery_service_principals
+      }
+
+      # IfExists keeps delivery working for a service that does not send its source account.
+      condition {
+        test     = "StringEqualsIfExists"
+        variable = "aws:SourceAccount"
+        values   = [data.aws_caller_identity.current.account_id]
       }
     }
   }

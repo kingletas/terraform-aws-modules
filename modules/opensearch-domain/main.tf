@@ -1,7 +1,10 @@
 locals {
-  in_vpc               = length(var.subnet_ids) > 0
+  in_vpc               = !var.public
   zone_aware           = var.zone_awareness_count > 1
   fine_grained_enabled = var.master_user != null || var.master_user_arn != null
+
+  # Auto-Tune is not available on T2 and T3 instance types.
+  auto_tune_supported = !can(regex("^t[23]\\.", var.instance_type))
 
   tags = merge(var.tags, { Name = var.name })
 }
@@ -73,8 +76,13 @@ resource "aws_opensearch_domain" "this" {
     }
   }
 
-  auto_tune_options {
-    desired_state = var.auto_tune_enabled ? "ENABLED" : "DISABLED"
+  # Omitted on instance types without Auto-Tune, which refuse any Auto-Tune setting.
+  dynamic "auto_tune_options" {
+    for_each = local.auto_tune_supported ? [1] : []
+
+    content {
+      desired_state = var.auto_tune_enabled ? "ENABLED" : "DISABLED"
+    }
   }
 
   off_peak_window_options {

@@ -61,8 +61,19 @@ variable "volume_type" {
 
 variable "subnet_ids" {
   type        = list(string)
-  description = "Private subnets to place the domain in. Empty puts the domain on the public internet, which is almost never right."
+  description = "Private subnets to place the domain in. Required unless public is true."
   default     = []
+}
+
+variable "public" {
+  type        = bool
+  description = "Put the domain on a public endpoint instead of in subnets. Almost never right, so it has to be asked for."
+  default     = false
+
+  validation {
+    condition     = var.public != (length(var.subnet_ids) > 0)
+    error_message = "Set subnet_ids to place the domain in a VPC, or set public = true and leave subnet_ids empty for a public endpoint."
+  }
 }
 
 variable "security_group_ids" {
@@ -110,7 +121,7 @@ variable "log_publishing" {
 
 variable "auto_tune_enabled" {
   type        = bool
-  description = "Let AWS adjust JVM and queue settings from observed load."
+  description = "Let AWS adjust JVM and queue settings from observed load. Always off on T2 and T3 instance types, which do not support it."
   default     = true
 }
 

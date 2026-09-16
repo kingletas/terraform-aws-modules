@@ -6,7 +6,7 @@ A role, its trust policy and its attachments, covering service, cross-account an
 
 ```hcl
 module "task_role" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/iam-role?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/iam-role?ref=v0.3.0"
 
   name             = "platform-api-task"
   description      = "Application code for the API service"
@@ -24,7 +24,7 @@ An OIDC trust is how a CI workflow gets credentials with nothing stored in the r
 
 ```hcl
 module "deploy_role" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/iam-role?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/iam-role?ref=v0.3.0"
 
   name = "platform-deploy"
 
@@ -40,12 +40,15 @@ module "deploy_role" {
 }
 ```
 
-**Always set `subjects`.** Without a subject condition the trust accepts a token from *any* repository on GitHub, which hands the role to the entire internet.
+**Every OIDC trust needs `subject_key` and at least one subject.** Without a subject condition the trust would accept a token from *any* repository on GitHub, so the module refuses it at plan. It also refuses a subject made only of wildcards, and a GitHub subject that does not start with `repo:<owner>/` and a literal owner, such as `repo:example-org/app:ref:refs/heads/main`.
+
+Each key in `trusted_oidc_providers` becomes a policy statement ID, which allows only letters and digits. Keys must still differ once everything else is stripped, so `ci-main` and `ci_main` cannot both be used.
 
 ## Notes
 
 - `external_id` is the defence against the confused deputy problem, where a third party you trust is tricked into using your role on someone else's behalf. Set it whenever the trusted principal is outside your organisation.
 - `permissions_boundary_arn` caps what the role can ever be granted, however its policies change later. It is the useful control when somebody else can attach policies.
+- The role's outputs are available only once its managed and inline policies are attached, so a resource that uses the role never starts with it half granted.
 - Inline policies live and die with the role; managed policies outlive it and can be shared.
 
 <!-- BEGIN_TF_DOCS -->
@@ -79,7 +82,7 @@ module "deploy_role" {
 | description | What this role is for. | `string` | `null` | no |
 | trusted\_services | AWS service principals allowed to assume the role, such as ec2.amazonaws.com. | `list(string)` | `[]` | no |
 | trusted\_role\_arns | IAM role or account ARNs allowed to assume the role. | `list(string)` | `[]` | no |
-| trusted\_oidc\_providers | OIDC providers allowed to assume the role, keyed by a stable name. This is how a GitHub Actions workflow gets credentials without a stored key. | <pre>map(object({<br/>    provider_arn = string<br/>    audience_key = string<br/>    audiences    = list(string)<br/>    subject_key  = optional(string)<br/>    subjects     = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
+| trusted\_oidc\_providers | OIDC providers allowed to assume the role, keyed by a stable name. Each must name the subject claim and the subjects it accepts; a GitHub subject must start with repo:<owner>/ and a literal owner. | <pre>map(object({<br/>    provider_arn = string<br/>    audience_key = string<br/>    audiences    = list(string)<br/>    subject_key  = string<br/>    subjects     = list(string)<br/>  }))</pre> | `{}` | no |
 | require\_mfa | Require multi-factor authentication on assume. Applies to the role and account principals only. | `bool` | `false` | no |
 | external\_id | External ID a third party must present on assume. The defence against the confused deputy problem. | `string` | `null` | no |
 | max\_session\_duration | Longest session in seconds, between one and twelve hours. | `number` | `3600` | no |
@@ -93,10 +96,10 @@ module "deploy_role" {
 
 | Name | Description |
 | ---- | ----------- |
-| arn | ARN of the role. |
-| name | Generated name of the role. |
-| id | ID of the role, which is the same as its name. |
-| unique\_id | Stable unique ID, which does not change if the role is renamed. |
-| instance\_profile\_name | Instance profile name, or null when none was created. |
-| instance\_profile\_arn | Instance profile ARN, or null when none was created. |
+| arn | ARN of the role, available only once its policies are attached so a consumer never assumes it half-granted. |
+| name | Generated name of the role, available only once its policies are attached. |
+| id | ID of the role, which is the same as its name, available only once its policies are attached. |
+| unique\_id | Stable unique ID, which does not change if the role is renamed, available only once its policies are attached. |
+| instance\_profile\_name | Instance profile name, or null when none was created, available only once the role's policies are attached. |
+| instance\_profile\_arn | Instance profile ARN, or null when none was created, available only once the role's policies are attached. |
 <!-- END_TF_DOCS -->

@@ -6,7 +6,7 @@ A search domain inside your VPC, encrypted at rest and in flight, with HTTPS enf
 
 ```hcl
 module "search" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/opensearch-domain?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/opensearch-domain?ref=v0.3.0"
 
   name           = "platform-search"
   instance_type  = "r7g.large.search"
@@ -23,11 +23,12 @@ module "search" {
 
 `instance_count` must divide evenly by `zone_awareness_count`, or shards spread unevenly and one zone does more work than the others. The module checks this at plan time.
 
-Dedicated master nodes keep cluster management off the data nodes. Use **three**, never two — a two-node master quorum cannot break a tie, which is worse than one.
+Dedicated master nodes keep cluster management off the data nodes. Use **three**, never two: a two-node master quorum cannot break a tie, which is worse than one.
 
 ## Notes
 
-- Leaving `subnet_ids` empty puts the domain on the public internet. Almost nothing should do that.
+- Set `subnet_ids` to place the domain in your VPC, or set `public = true` and leave `subnet_ids` empty for a public endpoint. The plan refuses both and neither. Almost nothing should be public.
+- Auto-Tune is left out on T2 and T3 instance types, which do not support it, whatever `auto_tune_enabled` says.
 - A domain name is capped at 28 characters.
 - Fine-grained access control needs either `master_user_arn` for IAM, or `master_user` for an internal database. Prefer IAM.
 - Changing most cluster settings triggers a blue/green deployment that takes tens of minutes and does not interrupt queries.
@@ -64,14 +65,15 @@ Dedicated master nodes keep cluster management off the data nodes. Use **three**
 | zone\_awareness\_count | Availability zones to spread across. One disables zone awareness. | `number` | `2` | no |
 | volume\_size | EBS volume size per data node, in gibibytes. | `number` | `20` | no |
 | volume\_type | EBS volume type for data nodes. | `string` | `"gp3"` | no |
-| subnet\_ids | Private subnets to place the domain in. Empty puts the domain on the public internet, which is almost never right. | `list(string)` | `[]` | no |
+| subnet\_ids | Private subnets to place the domain in. Required unless public is true. | `list(string)` | `[]` | no |
+| public | Put the domain on a public endpoint instead of in subnets. Almost never right, so it has to be asked for. | `bool` | `false` | no |
 | security\_group\_ids | Security groups for the domain's network interfaces. | `list(string)` | `[]` | no |
 | kms\_key\_arn | KMS key for encryption at rest. Null uses the AWS-managed OpenSearch key. | `string` | `null` | no |
 | master\_user | Internal database master user, used when fine-grained access control is on. Prefer master\_user\_arn and IAM. | <pre>object({<br/>    name     = string<br/>    password = string<br/>  })</pre> | `null` | no |
 | master\_user\_arn | IAM ARN acting as master user under fine-grained access control. Cannot be combined with master\_user. | `string` | `null` | no |
 | access\_policy\_json | Domain access policy. Null leaves access to whatever fine-grained access control and the security groups allow. | `string` | `null` | no |
 | log\_publishing | Log publishing keyed by log type: INDEX\_SLOW\_LOGS, SEARCH\_SLOW\_LOGS, ES\_APPLICATION\_LOGS or AUDIT\_LOGS. | <pre>map(object({<br/>    cloudwatch_log_group_arn = string<br/>    enabled                  = optional(bool, true)<br/>  }))</pre> | `{}` | no |
-| auto\_tune\_enabled | Let AWS adjust JVM and queue settings from observed load. | `bool` | `true` | no |
+| auto\_tune\_enabled | Let AWS adjust JVM and queue settings from observed load. Always off on T2 and T3 instance types, which do not support it. | `bool` | `true` | no |
 | off\_peak\_window\_start\_hour | Hour in UTC when the daily maintenance window opens. | `number` | `3` | no |
 | tags | Tags applied to the domain. | `map(string)` | `{}` | no |
 

@@ -1,6 +1,12 @@
 locals {
   has_principals = length(var.trusted_services) > 0 || length(var.trusted_role_arns) > 0 || length(var.trusted_oidc_providers) > 0
   tags           = merge(var.tags, { Name = var.name })
+
+  # IAM statement IDs allow only letters and digits.
+  oidc_statement_ids = {
+    for key in keys(var.trusted_oidc_providers) :
+    key => format("TrustOidc%s", replace(title(replace(key, "/[^A-Za-z0-9]+/", " ")), " ", ""))
+  }
 }
 
 data "aws_iam_policy_document" "assume_role" {
@@ -58,7 +64,7 @@ data "aws_iam_policy_document" "assume_role" {
     for_each = var.trusted_oidc_providers
 
     content {
-      sid     = format("TrustOidc%s", title(replace(statement.key, "-", "")))
+      sid     = local.oidc_statement_ids[statement.key]
       effect  = "Allow"
       actions = ["sts:AssumeRoleWithWebIdentity"]
 
@@ -73,14 +79,10 @@ data "aws_iam_policy_document" "assume_role" {
         values   = statement.value.audiences
       }
 
-      dynamic "condition" {
-        for_each = statement.value.subject_key == null ? [] : [statement.value]
-
-        content {
-          test     = "StringLike"
-          variable = condition.value.subject_key
-          values   = condition.value.subjects
-        }
+      condition {
+        test     = "StringLike"
+        variable = statement.value.subject_key
+        values   = statement.value.subjects
       }
     }
   }

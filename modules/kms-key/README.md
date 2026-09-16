@@ -6,7 +6,7 @@ A customer-managed key with rotation on, an alias, and a key policy built from t
 
 ```hcl
 module "kms" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/kms-key?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/kms-key?ref=v0.3.0"
 
   name        = "platform-data"
   description = "Encrypts application data at rest"
@@ -18,13 +18,16 @@ module "kms" {
 
 ## The key policy is the real access control
 
-A KMS key's own policy is evaluated *before* IAM. With no explicit policy, AWS applies a default that grants account root full control, which effectively delegates to IAM — and that is what most keys end up with by accident.
+A KMS key's own policy is evaluated *before* IAM. With no explicit policy, AWS applies a default that grants account root full control, which effectively delegates to IAM. That is what most keys end up with by accident.
 
 This module always writes a policy. With no `admin_arns` it names account root, which reproduces the default behaviour deliberately rather than by omission. Naming real principals in `admin_arns` narrows it, and **a key policy that names nobody who can administer it is a key nobody can recover**.
 
+AWS refuses to create a key whose policy would lock out the identity creating it. So when `admin_arns` is set, the identity running Terraform is added to it, resolved to its role when it is an assumed-role session. Set `include_caller_as_admin = false` when `admin_arns` already names that identity.
+
 ## Notes
 
-- A CloudWatch log group encrypted with a key needs `logs.<region>.amazonaws.com` in `service_principals`, or the log group cannot be created and the error does not mention the key.
+- A CloudWatch log group encrypted with a key needs `logs.<region>.amazonaws.com` in `service_principals`, or the log group cannot be created and the error does not mention the key. Service use is limited to requests from this account whenever the service says which account it acts for.
+- An SNS topic encrypted with this key drops messages from CloudWatch alarms and EventBridge unless those services can use the key. Put `cloudwatch.amazonaws.com` or `events.amazonaws.com` in `delivery_service_principals`, which grants only `kms:Decrypt` and `kms:GenerateDataKey*` for requests from this account.
 - `deletion_window_in_days` is the only window in which a scheduled deletion can be cancelled. Seven days is short for a key protecting production data.
 - Rotation applies to symmetric keys only. It rotates the backing material; the key ID and every ciphertext stay valid.
 
@@ -63,8 +66,10 @@ This module always writes a policy. With no `admin_arns` it names account root, 
 | rotation\_period\_in\_days | Days between automatic rotations, between 90 and 2560. | `number` | `365` | no |
 | deletion\_window\_in\_days | Days a scheduled deletion waits. This is the only window in which a deletion can be cancelled, so short is risky. | `number` | `30` | no |
 | admin\_arns | Principals allowed to administer the key. Empty falls back to account root, which grants every IAM identity that has kms permissions. | `list(string)` | `[]` | no |
+| include\_caller\_as\_admin | Add the identity running Terraform to admin\_arns, resolved to its role for an assumed-role session. AWS refuses to create a key whose policy would lock that identity out, so turn this off only when admin\_arns already names it. | `bool` | `true` | no |
 | user\_arns | Principals allowed to encrypt and decrypt with the key. | `list(string)` | `[]` | no |
-| service\_principals | AWS service principals allowed to use the key, such as logs.us-east-1.amazonaws.com. | `list(string)` | `[]` | no |
+| service\_principals | AWS service principals allowed to encrypt, decrypt and describe with the key, such as logs.us-east-1.amazonaws.com. Granted when the request comes from this account. | `list(string)` | `[]` | no |
+| delivery\_service\_principals | AWS services that deliver to a resource encrypted with this key, such as cloudwatch.amazonaws.com for alarms or events.amazonaws.com for EventBridge publishing to an SNS topic. Granted kms:Decrypt and kms:GenerateDataKey* when the request comes from this account. | `list(string)` | `[]` | no |
 | policy\_json | A complete key policy, replacing the one this module builds. Use it when the generated policy is not enough. | `string` | `null` | no |
 | aliases | Extra aliases, without the alias/ prefix. | `list(string)` | `[]` | no |
 | tags | Tags applied to the key. | `map(string)` | `{}` | no |

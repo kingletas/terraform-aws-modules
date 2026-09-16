@@ -55,6 +55,12 @@ variable "admin_arns" {
   default     = []
 }
 
+variable "include_caller_as_admin" {
+  type        = bool
+  description = "Add the identity running Terraform to admin_arns, resolved to its role for an assumed-role session. AWS refuses to create a key whose policy would lock that identity out, so turn this off only when admin_arns already names it."
+  default     = true
+}
+
 variable "user_arns" {
   type        = list(string)
   description = "Principals allowed to encrypt and decrypt with the key."
@@ -63,8 +69,24 @@ variable "user_arns" {
 
 variable "service_principals" {
   type        = list(string)
-  description = "AWS service principals allowed to use the key, such as logs.us-east-1.amazonaws.com."
+  description = "AWS service principals allowed to encrypt, decrypt and describe with the key, such as logs.us-east-1.amazonaws.com. Granted when the request comes from this account."
   default     = []
+
+  validation {
+    condition     = alltrue([for principal in var.service_principals : can(regex("^[a-z0-9.-]+\\.amazonaws\\.com(\\.cn)?$", principal))])
+    error_message = "Each service principal must be a service principal such as logs.us-east-1.amazonaws.com."
+  }
+}
+
+variable "delivery_service_principals" {
+  type        = list(string)
+  description = "AWS services that deliver to a resource encrypted with this key, such as cloudwatch.amazonaws.com for alarms or events.amazonaws.com for EventBridge publishing to an SNS topic. Granted kms:Decrypt and kms:GenerateDataKey* when the request comes from this account."
+  default     = []
+
+  validation {
+    condition     = alltrue([for principal in var.delivery_service_principals : can(regex("^[a-z0-9.-]+\\.amazonaws\\.com(\\.cn)?$", principal))])
+    error_message = "Each delivery service principal must be a service principal such as events.amazonaws.com."
+  }
 }
 
 variable "policy_json" {

@@ -26,11 +26,44 @@ variable "trusted_oidc_providers" {
     provider_arn = string
     audience_key = string
     audiences    = list(string)
-    subject_key  = optional(string)
-    subjects     = optional(list(string), [])
+    subject_key  = string
+    subjects     = list(string)
   }))
-  description = "OIDC providers allowed to assume the role, keyed by a stable name. This is how a GitHub Actions workflow gets credentials without a stored key."
+  description = "OIDC providers allowed to assume the role, keyed by a stable name. Each must name the subject claim and the subjects it accepts; a GitHub subject must start with repo:<owner>/ and a literal owner."
   default     = {}
+
+  validation {
+    condition = alltrue([
+      for key, provider in var.trusted_oidc_providers : length(provider.subjects) > 0 && trimspace(provider.subject_key) != ""
+    ])
+    error_message = "Each OIDC provider needs a subject_key and at least one subject, or any identity the issuer signs for can assume the role."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for key, provider in var.trusted_oidc_providers : [
+        for subject in provider.subjects : !can(regex("^[*?]*$", subject))
+      ]
+    ]))
+    error_message = "An OIDC subject cannot be empty or made only of wildcards."
+  }
+
+  # A GitHub subject is recognised by its claim key or by the repo: prefix.
+  validation {
+    condition = alltrue(flatten([
+      for key, provider in var.trusted_oidc_providers : [
+        for subject in provider.subjects : can(regex("^repo:[A-Za-z0-9][A-Za-z0-9-]*/[^/]", subject))
+      ] if strcontains(provider.subject_key, "token.actions.githubusercontent.com") || anytrue([for subject in provider.subjects : startswith(subject, "repo:")])
+    ]))
+    error_message = "A GitHub OIDC subject must start with repo:<owner>/ with a literal owner, such as repo:example-org/app:ref:refs/heads/main."
+  }
+
+  validation {
+    condition = length(distinct([
+      for key in keys(var.trusted_oidc_providers) : lower(replace(key, "/[^A-Za-z0-9]/", ""))
+    ])) == length(var.trusted_oidc_providers)
+    error_message = "OIDC provider keys must stay distinct once reduced to letters and digits, because each becomes a policy statement ID."
+  }
 }
 
 variable "require_mfa" {

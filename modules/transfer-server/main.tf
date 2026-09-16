@@ -1,9 +1,15 @@
 locals {
   in_vpc = var.endpoint_type == "VPC"
   tags   = merge(var.tags, { Name = var.name })
+
+  # The prefix each user's home directory maps to, which the user's policy is scoped to.
+  user_prefixes = {
+    for username, user in var.users : username => user.home_directory == null ? username : trim(user.home_directory, "/")
+  }
 }
 
 data "aws_partition" "current" {}
+data "aws_region" "current" {}
 
 resource "aws_cloudwatch_log_group" "this" {
   name              = format("/aws/transfer/%s", var.name)
@@ -73,7 +79,7 @@ resource "aws_transfer_server" "this" {
   }
 }
 
-# Each user is scoped to its own prefix and cannot list the bucket root.
+# Each user is scoped to its home directory prefix and cannot list the bucket root.
 data "aws_iam_policy_document" "user" {
   for_each = var.users
 
@@ -86,7 +92,7 @@ data "aws_iam_policy_document" "user" {
     condition {
       test     = "StringLike"
       variable = "s3:prefix"
-      values   = [format("%s/*", each.key), format("%s", each.key)]
+      values   = [format("%s/*", local.user_prefixes[each.key]), local.user_prefixes[each.key]]
     }
   }
 
@@ -100,7 +106,7 @@ data "aws_iam_policy_document" "user" {
       "s3:GetObjectACL",
     ]
 
-    resources = [format("arn:%s:s3:::%s/%s/*", data.aws_partition.current.partition, var.bucket_name, each.key)]
+    resources = [format("arn:%s:s3:::%s/%s/*", data.aws_partition.current.partition, var.bucket_name, local.user_prefixes[each.key])]
   }
 
   dynamic "statement" {
@@ -116,7 +122,24 @@ data "aws_iam_policy_document" "user" {
         "s3:DeleteObjectVersion",
       ]
 
-      resources = [format("arn:%s:s3:::%s/%s/*", data.aws_partition.current.partition, var.bucket_name, each.key)]
+      resources = [format("arn:%s:s3:::%s/%s/*", data.aws_partition.current.partition, var.bucket_name, local.user_prefixes[each.key])]
+    }
+  }
+
+  dynamic "statement" {
+    for_each = var.bucket_kms_key == null ? [] : [var.bucket_kms_key]
+
+    content {
+      sid       = "UseBucketKeyThroughS3"
+      effect    = "Allow"
+      actions   = each.value.read_only ? ["kms:Decrypt"] : ["kms:Decrypt", "kms:GenerateDataKey"]
+      resources = [statement.value.arn]
+
+      condition {
+        test     = "StringEquals"
+        variable = "kms:ViaService"
+        values   = [format("s3.%s.%s", data.aws_region.current.region, data.aws_partition.current.dns_suffix)]
+      }
     }
   }
 }
@@ -161,7 +184,7 @@ resource "aws_transfer_user" "this" {
 
   home_directory_mappings {
     entry  = "/"
-    target = format("/%s/%s", var.bucket_name, coalesce(each.value.home_directory, each.key))
+    target = format("/%s/%s", var.bucket_name, local.user_prefixes[each.key])
   }
 
   dynamic "posix_profile" {

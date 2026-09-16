@@ -19,7 +19,7 @@ variable "routes" {
   type = map(object({
     path                    = string
     method                  = string
-    authorization           = optional(string, "NONE")
+    authorization           = string
     authorizer_key          = optional(string)
     api_key_required        = optional(bool, false)
     lambda_invoke_arn       = optional(string)
@@ -28,8 +28,29 @@ variable "routes" {
     integration_http_method = optional(string, "POST")
     request_parameters      = optional(map(bool), {})
   }))
-  description = "Routes keyed by a stable name. Paths use {braces} for path parameters. Ignored when openapi_body is set."
+  description = "Routes keyed by a stable name. A path such as /orders/{id} may be up to six segments deep, and / is the API root. Every route states its authorization, so a public route is a choice rather than a default. Ignored when openapi_body is set."
   default     = {}
+
+  validation {
+    condition = alltrue([
+      for key, route in var.routes : contains(["NONE", "AWS_IAM", "CUSTOM", "COGNITO_USER_POOLS"], route.authorization)
+    ])
+    error_message = "Each route's authorization must be NONE, AWS_IAM, CUSTOM or COGNITO_USER_POOLS."
+  }
+
+  validation {
+    condition = alltrue([
+      for key, route in var.routes : can(regex("^/?$|^/?[^/]+(/[^/]+){0,5}/?$", route.path))
+    ])
+    error_message = "Each route path must be / or up to six non-empty segments separated by single slashes, such as /orders/{id}."
+  }
+
+  validation {
+    condition = alltrue([
+      for key, route in var.routes : route.integration_type == "MOCK" || route.lambda_invoke_arn != null || route.integration_uri != null
+    ])
+    error_message = "Every route except a MOCK integration needs lambda_invoke_arn or integration_uri."
+  }
 }
 
 variable "authorizers" {
@@ -113,6 +134,12 @@ variable "policy_json" {
   type        = string
   description = "Resource policy. Required in practice for a PRIVATE API, which otherwise allows nothing."
   default     = null
+}
+
+variable "manage_account_cloudwatch_role" {
+  type        = bool
+  description = "Create the IAM role API Gateway uses to write logs and set it on the account. Access logging fails without that account setting, but it is one per account and region, so leave this off where something else already manages it."
+  default     = false
 }
 
 variable "tags" {
