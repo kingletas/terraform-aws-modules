@@ -31,7 +31,7 @@ checkov 3.3.15
 conftest 0.62.0
 ```
 
-**You only need Terraform to follow this guide.** The other four are for `make check`, which you run before changing a module.
+**You only need Terraform, `make` and `bash` to follow this guide.** The other four tools are for `make check`, which you run before changing a module.
 
 Install Terraform from [HashiCorp's site](https://developer.hashicorp.com/terraform/install). When you need the others, get them from their release pages: [tflint](https://github.com/terraform-linters/tflint/releases), [terraform-docs](https://github.com/terraform-docs/terraform-docs/releases) and [conftest](https://github.com/open-policy-agent/conftest/releases). Install checkov with `pip install checkov==3.3.15`. Then check Terraform's version:
 
@@ -57,11 +57,13 @@ make help
 
 Every example has a plan test. It runs `terraform plan` against **mock providers**: stand-ins that answer the way AWS would, so every expression is evaluated with real values and nothing is created.
 
-Start with the smallest example, two instances in a private VPC:
+Start with the smallest example, two instances in a private VPC. From the top of the repository:
 
 ```bash
-cd examples/ec2-in-vpc && terraform init && terraform test
+make test DIR=examples/ec2-in-vpc
 ```
+
+`make test` runs with fake AWS credentials, so even a test that goes wrong cannot reach an AWS account.
 
 A passing run looks like this:
 
@@ -88,8 +90,20 @@ If one fails, the error names the module and the line. A common cause is a `for_
 
 This needs AWS credentials. Anything that works for the AWS CLI works here: a profile, IAM Identity Center (SSO), or environment variables.
 
+From the top of the repository, move into the example and initialise it:
+
 ```bash
-cd examples/ec2-in-vpc && terraform plan
+cd examples/ec2-in-vpc
+```
+
+```bash
+terraform init
+```
+
+Then plan it:
+
+```bash
+terraform plan
 ```
 
 The plan shows everything that would be created. **Read it before applying.** This example runs a NAT gateway, which AWS bills by the hour whether anything uses it or not.

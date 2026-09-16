@@ -1,8 +1,7 @@
 name: Release
 
-# Tagging is the whole trigger: `git tag v1.2.3 && git push --tags` checks the
-# changelog has a section for it, then publishes a GitHub Release whose body is
-# that section.
+# Pushing an annotated tag starts a release: `git tag -a vX.Y.Z -m "X.Y.Z"` then
+# `git push origin vX.Y.Z`. The GitHub Release body is that version's changelog section.
 on:
   push:
     tags: ["v*"]
@@ -16,11 +15,7 @@ permissions:
   contents: read
 
 jobs:
-  # The gate already runs on every push to main, so a tag on a commit main has
-  # proved would run it a second time over an identical tree. Asked rather than
-  # assumed: only a completed, successful CI run for this exact commit skips it.
-  # A run still going, a failed lookup and a tag on an unproved commit all mean
-  # run the gate, because the cheap answer must never be the one that skips it.
+  # Looks for a completed, successful CI run on this exact commit, and only that skips the gate.
   proved:
     name: Has this commit already passed
     runs-on: ubuntu-latest
@@ -63,9 +58,7 @@ jobs:
 
   release:
     needs: [proved, check]
-    # `always()` is needed only because a skipped dependency would otherwise
-    # skip this too. The conditions are written as what must be true rather than
-    # what must not, so a state nobody thought of stops the release.
+    # Publishes only when the lookup succeeded and the gate passed or was skipped.
     if: >-
       always() &&
       needs.proved.result == 'success' &&

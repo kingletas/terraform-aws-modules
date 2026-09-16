@@ -6,7 +6,10 @@ Security fixes go to the `main` branch and are released as part of the current m
 
 ## Reporting a vulnerability
 
-Do not open a public issue or pull request for a security problem. Email **code@kingletas.com** instead.
+Do not open a public issue or pull request for a security problem. Report it privately instead:
+
+- **Preferred:** on GitHub, open the repository's **Security** tab and select **Report a vulnerability**. The report is visible only to you and the maintainers.
+- **Alternative:** email **code@kingletas.com**.
 
 Include:
 

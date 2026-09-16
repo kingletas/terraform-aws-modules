@@ -11,10 +11,10 @@ Everything has to pass. If a lane cannot run because a tool is missing or is the
 To run the tests for one module or example while you work on it:
 
 ```bash
-terraform -chdir=modules/<name> init -backend=false && terraform -chdir=modules/<name> test
+make test DIR=modules/<name>
 ```
 
-The same works for `examples/<name>`.
+The same works for `DIR=examples/<name>`. Use `make test` rather than `terraform test` directly: it runs with fake AWS credentials and closed AWS endpoints, so a test whose mock provider stops applying fails instead of reaching a real account.
 
 ## Adding a module
 
@@ -22,14 +22,14 @@ A module goes in `modules/<name>/`:
 
 | File | Holds | Checked by |
 |---|---|---|
-| `versions.tf` | `required_version` and `required_providers`, and nothing else | `make policy` fails without it |
+| `versions.tf` | `required_version` and `required_providers`, and nothing else | `make policy` fails without it, or on a provider with no version or an exact pin; `make lint` fails without `required_version` or a provider version |
 | `variables.tf` | Every input, each with a type and a description | `make policy` fails without it; `make lint` fails on an input with no type or description |
 | `outputs.tf` | Every output, each with a description | `make policy` fails without it; `make lint` fails on an output with no description |
 | `main.tf` | Resources. Split into further files when one gets long | Convention |
 | `README.md` | Prose, plus the generated tables between the `TF_DOCS` markers | Convention; `make docs-check` fails when the tables are out of date |
-| `tests/plan.tftest.hcl` | A plan test, when no example already uses the module | Convention |
+| `tests/plan.tftest.hcl` | A plan test, when no example already uses the module | Convention; `make plan-test` runs it |
 
-Then prove it plans. Use it in an example under `examples/`, whose `tests/plan.tftest.hcl` plans every module the example calls, or give the module a `tests/plan.tftest.hcl` of its own. `terraform validate` alone will not tell you it works, because it runs with every variable unknown. `make plan-test` runs every example's test and every module test with real values against mock providers.
+Then prove it plans. Use it in an example under `examples/`, whose `tests/plan.tftest.hcl` plans every module the example calls, or give the module a `tests/plan.tftest.hcl` of its own. `terraform validate` alone will not tell you it works, because it runs with every variable unknown. `make plan-test` runs every example's test and every module test with real values against mock providers, and `make test DIR=...` runs one.
 
 A good module test also checks the direction that refuses: a `run` block with `expect_failures` for each validation or precondition, so a rule that stops matching fails the test.
 
@@ -66,10 +66,14 @@ Add an entry under `## [Unreleased]` in `CHANGELOG.md` as part of the change. Sa
 
 ## Releasing
 
-People use these modules by tag, so a change is not reachable until it is released. Move the `## [Unreleased]` entries under a new version heading, add the link definition at the bottom of the file, then tag:
+People use these modules by tag, so a change is not reachable until it is released. Move the `## [Unreleased]` entries under a new version heading such as `## [0.3.0] - 2026-09-16`, leave an empty `## [Unreleased]` above it, point the `[Unreleased]` link at the new tag and add a link for the version at the bottom of the file, then tag:
 
 ```bash
-git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z
+git tag -a vX.Y.Z -m "X.Y.Z"
+```
+
+```bash
+git push origin vX.Y.Z
 ```
 
 The tag starts the release workflow, which checks the changelog has a section for that version and publishes it as the release notes.

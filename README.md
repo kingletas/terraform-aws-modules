@@ -6,6 +6,8 @@ Fifty-nine reusable Terraform modules for AWS, covering multi-account setup, net
 
 Each module does one thing, and you compose them. Every input is typed, described and validated where it can be, and every collection is keyed by a name you choose rather than by list position.
 
+This repository is unrelated to the [terraform-aws-modules](https://github.com/terraform-aws-modules) organisation on GitHub.
+
 New here? [From nothing to a planned stack](docs/from-nothing.md) takes you from a clone to a planned example, without an AWS account, in about ten minutes.
 
 ## Contents
@@ -160,6 +162,8 @@ Replace `<commit-sha>` with the full 40-character commit SHA. `git ls-remote --t
 | Terraform | >= 1.9 |
 | AWS provider | >= 6.0, < 7.0 |
 
+The modules are written for and tested with Terraform. OpenTofu is not tested.
+
 `dynamodb-table` needs AWS provider 6.37.0 or later. A few modules also need the `random`, `tls` or `local` provider; each module's README lists its providers.
 
 Modules declare a version range so they fit the provider version you already run. The examples declare a range too (`~> 6.0`) and commit a `.terraform.lock.hcl`, which records the exact provider version and checksums they were tested with.
@@ -184,8 +188,10 @@ The tests assert on the planned values, and include refusal tests: runs that set
 To run one module's or one example's tests:
 
 ```bash
-terraform -chdir=modules/vpc init -backend=false && terraform -chdir=modules/vpc test
+make test DIR=modules/vpc
 ```
+
+Every check runs with fake AWS credentials and with AWS endpoints pointed at a closed local port, so no test can reach an AWS account.
 
 `make check` runs everything a change has to pass:
 
@@ -220,6 +226,7 @@ make help
 | `make fmt-check` | Fail if any file is not canonically formatted |
 | `make validate` | Initialise and validate every module and example |
 | `make plan-test` | Plan every example, and every module with its own test, against mock providers |
+| `make test DIR=...` | Run one module's or example's plan tests, such as `DIR=modules/vpc` |
 | `make lint` | Run tflint over every module and example |
 | `make security` | Run checkov over the repository |
 | `make policy` | Check this repository's conventions, and that each rule still refuses the case it exists for |

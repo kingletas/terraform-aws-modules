@@ -8,7 +8,7 @@ make policy
 
 ## What the rules check
 
-checkov and tflint judge the infrastructure the modules build: whether a bucket is public, whether a volume is encrypted, whether a variable has a description. These rules judge the module code itself, and none of them repeats a checkov or tflint check.
+checkov and tflint judge the infrastructure the modules build: whether a bucket is public, whether a volume is encrypted, whether a variable has a description. These rules judge the module code itself. One overlaps with tflint: its `terraform_required_providers` rule also fails a provider with no version, which the policy rule "Every required provider states a version" checks too.
 
 | Rule | What goes wrong when it is broken |
 |---|---|
@@ -29,10 +29,6 @@ The provider-block, range and three-files rules apply only under `modules/`. The
 Each fixture is copied under a `modules/` path before it is checked, because several rules only apply there.
 
 Fixture files are stored as `*.tf.fixture` and renamed to `.tf` only inside that temporary copy. They are deliberately broken Terraform, and under a `.tf` name scanners such as tflint and trivy would report them as real findings.
-
-## What is left to review
-
-`toset()` in a `for_each` is not a rule. It fails a first plan only when the set's values come from resources created in the same plan, and nothing in the source says where a value comes from. Reviewers check it against the convention in CONTRIBUTING.md.
 
 ## Adding a rule
 
