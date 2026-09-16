@@ -41,9 +41,10 @@ resource "aws_route53_record" "validation" {
   allow_overwrite = true
 }
 
+# Waits for issuance whoever writes the records; without record FQDNs it polls the certificate status.
 resource "aws_acm_certificate_validation" "this" {
-  count = local.manage_validation_records && var.wait_for_validation ? 1 : 0
+  count = var.wait_for_validation ? 1 : 0
 
   certificate_arn         = aws_acm_certificate.this.arn
-  validation_record_fqdns = [for record in aws_route53_record.validation : record.fqdn]
+  validation_record_fqdns = local.manage_validation_records ? [for record in aws_route53_record.validation : record.fqdn] : null
 }

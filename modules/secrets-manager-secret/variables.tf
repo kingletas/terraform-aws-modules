@@ -15,18 +15,19 @@ variable "kms_key_arn" {
   default     = null
 }
 
-variable "initial_value" {
-  type        = string
-  description = "First version of the secret. Anything set here lands in Terraform state in clear text; prefer generate_password or writing the value out of band."
+variable "initial_version" {
+  type = object({
+    value = optional(string)
+    json  = optional(map(string))
+  })
+  description = "First version of the secret: set exactly one of value or json. Whatever is set here lands in Terraform state in clear text; prefer generate_password or writing the value out of band."
   default     = null
   sensitive   = true
-}
 
-variable "initial_json" {
-  type        = map(string)
-  description = "First version as a JSON object. Same warning as initial_value: it reaches state."
-  default     = null
-  sensitive   = true
+  validation {
+    condition     = var.initial_version == null || nonsensitive((try(var.initial_version.value, null) == null) != (try(var.initial_version.json, null) == null))
+    error_message = "initial_version needs exactly one of value or json."
+  }
 }
 
 variable "generate_password" {

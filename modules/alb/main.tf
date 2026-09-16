@@ -1,6 +1,15 @@
 locals {
-  https_enabled = var.certificate_arn != null
+  https_enabled = var.create_https_listener
   tags          = merge(var.tags, { Name = var.name })
+
+  # A replacement gets a new name, so create_before_destroy never collides with the group it replaces.
+  target_group_names = {
+    for key, group in var.target_groups : key => format(
+      "%s-%s",
+      replace(substr(replace(format("%s-%s", var.name, key), "/[^a-zA-Z0-9-]/", "-"), 0, 25), "/-+$/", ""),
+      substr(sha1(jsonencode([key, var.vpc_id, group.port, group.protocol, group.protocol_version, group.target_type])), 0, 6)
+    )
+  }
 }
 
 # Public or internal is the caller's choice through var.internal; a storefront has to be public.
@@ -31,8 +40,23 @@ resource "aws_lb" "this" {
 
   lifecycle {
     precondition {
-      condition     = contains(keys(var.target_groups), var.default_target_group)
-      error_message = "The default_target_group must name one of the target_groups."
+      condition     = var.default_target_group == null ? var.default_fixed_response != null : contains(keys(var.target_groups), var.default_target_group)
+      error_message = "The default_target_group must name one of the target_groups, or default_fixed_response must be set."
+    }
+
+    precondition {
+      condition     = alltrue([for rule in values(var.listener_rules) : contains(keys(var.target_groups), rule.target_group)])
+      error_message = "Every listener rule must name one of the target_groups."
+    }
+
+    precondition {
+      condition     = !var.create_https_listener || var.certificate_arn != null
+      error_message = "An HTTPS listener needs a certificate_arn. Set create_https_listener = false for HTTP only."
+    }
+
+    precondition {
+      condition     = var.create_https_listener || var.create_http_listener
+      error_message = "The load balancer needs a listener: keep create_http_listener on while create_https_listener is off."
     }
   }
 }
@@ -40,7 +64,7 @@ resource "aws_lb" "this" {
 resource "aws_lb_target_group" "this" {
   for_each = var.target_groups
 
-  name             = substr(format("%s-%s", var.name, each.key), 0, 32)
+  name             = local.target_group_names[each.key]
   vpc_id           = var.vpc_id
   port             = each.value.port
   protocol         = each.value.protocol
@@ -86,16 +110,34 @@ resource "aws_lb_listener" "https" {
   ssl_policy        = var.ssl_policy
   certificate_arn   = var.certificate_arn
 
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.this[var.default_target_group].arn
+  dynamic "default_action" {
+    for_each = var.default_fixed_response == null ? [1] : []
+
+    content {
+      type             = "forward"
+      target_group_arn = aws_lb_target_group.this[var.default_target_group].arn
+    }
+  }
+
+  dynamic "default_action" {
+    for_each = var.default_fixed_response == null ? [] : [var.default_fixed_response]
+
+    content {
+      type = "fixed-response"
+
+      fixed_response {
+        status_code  = tostring(default_action.value.status_code)
+        content_type = default_action.value.content_type
+        message_body = default_action.value.message_body
+      }
+    }
   }
 
   tags = local.tags
 }
 
 resource "aws_lb_listener_certificate" "this" {
-  for_each = local.https_enabled ? toset(var.additional_certificate_arns) : []
+  for_each = local.https_enabled ? var.additional_certificate_arns : {}
 
   listener_arn    = aws_lb_listener.https[0].arn
   certificate_arn = each.value
@@ -104,6 +146,8 @@ resource "aws_lb_listener_certificate" "this" {
 # Port 80 redirects to HTTPS once a certificate is set, unless redirect_http_to_https is turned off.
 #trivy:ignore:AWS-0054
 resource "aws_lb_listener" "http" {
+  count = var.create_http_listener ? 1 : 0
+
   load_balancer_arn = aws_lb.this.arn
   port              = 80
   protocol          = "HTTP"
@@ -123,7 +167,7 @@ resource "aws_lb_listener" "http" {
   }
 
   dynamic "default_action" {
-    for_each = local.https_enabled && var.redirect_http_to_https ? [] : [1]
+    for_each = !(local.https_enabled && var.redirect_http_to_https) && var.default_fixed_response == null ? [1] : []
 
     content {
       type             = "forward"
@@ -131,13 +175,32 @@ resource "aws_lb_listener" "http" {
     }
   }
 
+  dynamic "default_action" {
+    for_each = !(local.https_enabled && var.redirect_http_to_https) && var.default_fixed_response != null ? [var.default_fixed_response] : []
+
+    content {
+      type = "fixed-response"
+
+      fixed_response {
+        status_code  = tostring(default_action.value.status_code)
+        content_type = default_action.value.content_type
+        message_body = default_action.value.message_body
+      }
+    }
+  }
+
   tags = local.tags
+}
+
+moved {
+  from = aws_lb_listener.http
+  to   = aws_lb_listener.http[0]
 }
 
 resource "aws_lb_listener_rule" "this" {
   for_each = var.listener_rules
 
-  listener_arn = local.https_enabled ? aws_lb_listener.https[0].arn : aws_lb_listener.http.arn
+  listener_arn = local.https_enabled ? aws_lb_listener.https[0].arn : aws_lb_listener.http[0].arn
   priority     = each.value.priority
 
   action {

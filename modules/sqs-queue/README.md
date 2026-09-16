@@ -6,7 +6,7 @@ A queue and its dead letter queue, because a queue without one redelivers a pois
 
 ```hcl
 module "orders" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/sqs-queue?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/sqs-queue?ref=v0.3.0"
 
   name                       = "order-events"
   visibility_timeout_seconds = 300
@@ -25,9 +25,10 @@ module "orders" {
 
 ## Notes
 
-- A FIFO queue takes the `.fifo` suffix automatically; you do not add it to `name`.
+- A FIFO queue takes the `.fifo` suffix automatically, so you do not need to add it to `name`.
 - `receive_wait_time_seconds` defaults to 20, which is long polling. Zero means short polling, which bills you for empty receives.
 - The dead letter queue accepts redrives from this queue and no other.
+- **An AWS service that sends to the queue needs a queue policy grant.** List it in `sending_services`, such as `["events.amazonaws.com"]`. The grant is limited to sources in this account by `aws:SourceAccount`, and to `sending_source_arns` when you set it. It is merged with `policy_json` when `attach_policy` is on. The Sid `AllowServiceSend` is reserved.
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements
@@ -68,6 +69,8 @@ module "orders" {
 | dead\_letter\_queue | Dead letter queue for messages that keep failing. On by default, because without one a poison message is redelivered forever. | <pre>object({<br/>    enabled                   = optional(bool, true)<br/>    max_receive_count         = optional(number, 5)<br/>    message_retention_seconds = optional(number, 1209600)<br/>  })</pre> | `{}` | no |
 | attach\_policy | Attach policy\_json as a resource policy. A bool rather than a null check, because a policy naming a resource in the same plan is not known to exist until apply. | `bool` | `false` | no |
 | policy\_json | Queue policy document. Null leaves the queue reachable only by IAM identities with explicit permission. | `string` | `null` | no |
+| sending\_services | Service principals allowed to send to the queue, such as cloudwatch.amazonaws.com, limited to this account by aws:SourceAccount. Merged into policy\_json when attach\_policy is on; the Sid AllowServiceSend is reserved. | `list(string)` | `[]` | no |
+| sending\_source\_arns | Source ARNs the sending\_services are further limited to, by aws:SourceArn. Empty allows any source in this account. | `list(string)` | `[]` | no |
 | tags | Tags applied to every resource this module creates. | `map(string)` | `{}` | no |
 
 ### Outputs

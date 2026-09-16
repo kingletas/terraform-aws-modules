@@ -160,8 +160,8 @@ variable "dead_letter_target_arn" {
 
 variable "tracing_mode" {
   type        = string
-  description = "X-Ray tracing: PassThrough follows an existing trace, Active starts one."
-  default     = "Active"
+  description = "X-Ray tracing: PassThrough follows an existing trace, Active starts one. Active needs xray:PutTraceSegments and xray:PutTelemetryRecords on the execution role, which this module does not manage."
+  default     = "PassThrough"
 
   validation {
     condition     = contains(["PassThrough", "Active"], var.tracing_mode)

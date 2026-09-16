@@ -29,11 +29,11 @@ output "target_group_arn_suffixes" {
 }
 
 output "https_listener_arn" {
-  description = "ARN of the HTTPS listener, or null when no certificate was given."
+  description = "ARN of the HTTPS listener, or null when create_https_listener is off."
   value       = local.https_enabled ? aws_lb_listener.https[0].arn : null
 }
 
 output "http_listener_arn" {
-  description = "ARN of the HTTP listener."
-  value       = aws_lb_listener.http.arn
+  description = "ARN of the HTTP listener, or null when create_http_listener is off."
+  value       = var.create_http_listener ? aws_lb_listener.http[0].arn : null
 }

@@ -1,11 +1,12 @@
 locals {
   # Whether a value was supplied is not itself a secret, only the value is.
-  has_initial_version = nonsensitive(var.initial_value != null || var.initial_json != null) || var.generate_password
+  has_initial_version = nonsensitive(var.initial_version != null) || var.generate_password
 
   secret_string = (
     var.generate_password ? random_password.this[0].result
-    : var.initial_json != null ? jsonencode(var.initial_json)
-    : var.initial_value
+    : var.initial_version == null ? null
+    : var.initial_version.json != null ? jsonencode(var.initial_version.json)
+    : var.initial_version.value
   )
 }
 
@@ -40,12 +41,8 @@ resource "aws_secretsmanager_secret" "this" {
 
   lifecycle {
     precondition {
-      condition = length(compact([
-        nonsensitive(var.initial_value == null ? null : "value"),
-        nonsensitive(var.initial_json == null ? null : "json"),
-        var.generate_password ? "generated" : null,
-      ])) <= 1
-      error_message = "Set at most one of initial_value, initial_json or generate_password."
+      condition     = !(var.generate_password && nonsensitive(var.initial_version != null))
+      error_message = "Set initial_version or generate_password, not both."
     }
   }
 }

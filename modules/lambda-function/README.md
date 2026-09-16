@@ -1,12 +1,12 @@
 # lambda-function
 
-A function with a managed log group, X-Ray tracing, and its event sources and permissions.
+A function with a managed log group, optional X-Ray tracing, and its event sources and permissions.
 
 ## Usage
 
 ```hcl
 module "processor" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/lambda-function?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/lambda-function?ref=v0.3.0"
 
   name     = "order-processor"
   role_arn = module.processor_role.arn
@@ -39,7 +39,8 @@ This module creates the group first, with retention set, and points the function
 
 - **`arn` and `invoke_arn` are different.** API Gateway and EventBridge need `invoke_arn`; an IAM policy needs `arn`. Using the wrong one gives an integration error that does not say so.
 - **Always set `source_arn` on an invoke permission.** Without it, granting `apigateway.amazonaws.com` lets *any* API Gateway in *any* account invoke your function.
-- More memory also buys more CPU, so a compute-bound function is often cheaper at 1024 MB than at 512 — it finishes more than twice as fast.
+- More memory also buys more CPU, so a compute-bound function is often cheaper at 1024 MB than at 512, because it finishes more than twice as fast.
+- `tracing_mode` defaults to `PassThrough`, which follows a trace an upstream service started. `Active` starts traces itself and needs `xray:PutTraceSegments` and `xray:PutTelemetryRecords` on the role you pass in `role_arn`; this module does not add them.
 - Putting a function in a VPC means it reaches the internet only through a NAT gateway or VPC endpoints.
 - `arm64` costs less per millisecond than `x86_64` and is the default here.
 
@@ -94,7 +95,7 @@ This module creates the group first, with retention set, and points the function
 | provisioned\_concurrency | Pre-warmed execution environments on the published version, removing cold starts. Billed whether used or not. Zero disables it. | `number` | `0` | no |
 | publish | Publish a numbered version on each change, which is what an alias and provisioned concurrency point at. | `bool` | `false` | no |
 | dead\_letter\_target\_arn | SQS queue or SNS topic receiving asynchronous invocations that exhausted their retries. | `string` | `null` | no |
-| tracing\_mode | X-Ray tracing: PassThrough follows an existing trace, Active starts one. | `string` | `"Active"` | no |
+| tracing\_mode | X-Ray tracing: PassThrough follows an existing trace, Active starts one. Active needs xray:PutTraceSegments and xray:PutTelemetryRecords on the execution role, which this module does not manage. | `string` | `"PassThrough"` | no |
 | log\_retention\_days | Days to keep logs. Without a managed log group, Lambda creates one that never expires. | `number` | `365` | no |
 | event\_source\_mappings | Pull-based event sources keyed by a stable name: SQS, Kinesis, DynamoDB streams. | <pre>map(object({<br/>    event_source_arn                   = string<br/>    batch_size                         = optional(number, 10)<br/>    maximum_batching_window_in_seconds = optional(number)<br/>    starting_position                  = optional(string)<br/>    function_response_types            = optional(list(string), [])<br/>    maximum_retry_attempts             = optional(number)<br/>    enabled                            = optional(bool, true)<br/>  }))</pre> | `{}` | no |
 | allowed\_invoke\_principals | Services allowed to invoke the function, keyed by a stable name. Always set source\_arn, or any caller of that service can invoke it. | <pre>map(object({<br/>    principal  = string<br/>    source_arn = optional(string)<br/>  }))</pre> | `{}` | no |

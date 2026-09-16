@@ -62,7 +62,7 @@ variable "default_behaviour" {
       function_arn = string
     })), {})
   })
-  description = "Cache behaviour for everything not matched by an ordered behaviour."
+  description = "Cache behaviour for everything not matched by an ordered behaviour. A null cache_policy_id uses Managed-CachingOptimized."
   default     = {}
 }
 
@@ -80,8 +80,16 @@ variable "ordered_behaviours" {
     origin_request_policy_id   = optional(string)
     response_headers_policy_id = optional(string)
   }))
-  description = "Path-specific behaviours keyed by a stable name. Lower precedence numbers are evaluated first."
+  description = "Path-specific behaviours keyed by a stable name. Lower precedence numbers are evaluated first, and equal precedences fall back to name order. A null cache_policy_id uses Managed-CachingOptimized."
   default     = {}
+
+  validation {
+    condition = alltrue([
+      for behaviour in values(var.ordered_behaviours) :
+      behaviour.precedence >= 0 && behaviour.precedence < 1000000000 && floor(behaviour.precedence) == behaviour.precedence
+    ])
+    error_message = "Each precedence must be a whole number from 0 to 999999999."
+  }
 }
 
 variable "price_class" {

@@ -39,7 +39,7 @@ variable "create_validation_records" {
 
 variable "wait_for_validation" {
   type        = bool
-  description = "Block the apply until the certificate is issued. Requires zone_id, and can take several minutes."
+  description = "Block the apply until the certificate is issued, whether this module or someone else writes the validation records. Can take several minutes, and fails after 75 if the records never appear."
   default     = true
 }
 

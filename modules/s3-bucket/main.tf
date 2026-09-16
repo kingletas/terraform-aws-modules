@@ -116,8 +116,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
   depends_on = [aws_s3_bucket_versioning.this]
 }
 
-# Anything arriving over plain HTTP is refused, whatever the bucket policy allows.
+# Anything arriving over plain HTTP is refused, whatever the caller's statements allow.
 data "aws_iam_policy_document" "this" {
+  source_policy_documents = var.policy_documents
+
   statement {
     sid       = "DenyInsecureTransport"
     effect    = "Deny"

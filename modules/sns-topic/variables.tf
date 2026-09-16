@@ -63,6 +63,18 @@ variable "policy_json" {
   }
 }
 
+variable "publishing_services" {
+  type        = list(string)
+  description = "Service principals allowed to publish to the topic, such as cloudwatch.amazonaws.com, limited to this account by aws:SourceAccount. Merged into policy_json when attach_policy is on; the Sid AllowServicePublish is reserved."
+  default     = []
+}
+
+variable "publishing_source_arns" {
+  type        = list(string)
+  description = "Source ARNs the publishing_services are further limited to, by aws:SourceArn. Empty allows any source in this account."
+  default     = []
+}
+
 variable "tags" {
   type        = map(string)
   description = "Tags applied to the topic."

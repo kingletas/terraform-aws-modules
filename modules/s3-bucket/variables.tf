@@ -55,6 +55,12 @@ variable "logging" {
   default     = null
 }
 
+variable "policy_documents" {
+  type        = list(string)
+  description = "IAM policy documents in JSON, merged into the bucket policy this module writes. A bucket has one policy, so grants such as CloudFront or CloudTrail access go here rather than in a second aws_s3_bucket_policy. The Sid DenyInsecureTransport is reserved. Build this bucket's ARN from its name here, because the arn output waits for the policy and referencing it forms a cycle."
+  default     = []
+}
+
 variable "force_destroy" {
   type        = bool
   description = "Let terraform destroy delete a bucket that still holds objects. Off, so a destroy fails loudly rather than deleting data."

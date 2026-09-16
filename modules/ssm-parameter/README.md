@@ -6,7 +6,7 @@ Parameters written as a set, with the shape and the values kept in separate vari
 
 ```hcl
 module "config" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/ssm-parameter?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/ssm-parameter?ref=v0.3.0"
 
   parameters = {
     "/prod/api/log-level"    = { description = "Application log level" }
@@ -24,7 +24,7 @@ module "config" {
 
 ## Why the values are a separate variable
 
-A parameter's *name* is not a secret; its value may be. Marking one map sensitive would hide the paths too, and Terraform refuses to iterate over a sensitive value at all — `for_each` on it fails the plan.
+A parameter's *name* is not a secret; its value may be. Marking one map sensitive would hide the paths too, and Terraform refuses to iterate over a sensitive value at all: `for_each` on it fails the plan.
 
 Splitting them keeps the paths visible in a plan, where you want to see which parameters are changing, while the values stay marked sensitive.
 
@@ -32,6 +32,7 @@ Splitting them keeps the paths visible in a plan, where you want to see which pa
 
 - `SecureString` is what makes a value encrypted. The type is per-parameter and the module does not guess.
 - Advanced tier costs money per parameter per month and raises the size limit to 8 KB. Standard is free and caps at 4 KB.
+- Every path in `parameters` needs an entry in `values`. The plan fails and names each path that has none.
 - A parameter that already exists fails the apply unless `overwrite_existing` is set.
 
 <!-- BEGIN_TF_DOCS -->

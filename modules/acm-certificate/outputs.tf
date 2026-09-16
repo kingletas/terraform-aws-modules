@@ -4,8 +4,8 @@ output "arn" {
 }
 
 output "validated_arn" {
-  description = "ARN that only resolves once the certificate is issued, so a listener cannot attach to a pending one."
-  value       = local.manage_validation_records && var.wait_for_validation ? aws_acm_certificate_validation.this[0].certificate_arn : aws_acm_certificate.this.arn
+  description = "ARN that only resolves once the certificate is issued, so a listener cannot attach to a pending one. With wait_for_validation off it is the same as arn and gives no such guarantee."
+  value       = var.wait_for_validation ? aws_acm_certificate_validation.this[0].certificate_arn : aws_acm_certificate.this.arn
 }
 
 output "domain_name" {

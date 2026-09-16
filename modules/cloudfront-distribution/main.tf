@@ -1,4 +1,11 @@
 locals {
+  # Zero-padded precedence then name, so a lexical sort is numeric order with a stable tie-break.
+  behaviours_by_sort_key = {
+    for name, behaviour in var.ordered_behaviours : format("%010d/%s", behaviour.precedence, name) => behaviour
+  }
+
+  ordered_behaviours = [for sort_key in sort(keys(local.behaviours_by_sort_key)) : local.behaviours_by_sort_key[sort_key]]
+
   oac_origins = { for id, origin in var.origins : id => origin if origin.create_origin_access_control }
 
   # An S3 REST endpoint is served through origin access control; everything else is a custom origin.
@@ -6,6 +13,11 @@ locals {
     for id, origin in var.origins : id => origin
     if origin.create_origin_access_control || origin.s3_origin_access_control_id != null
   }
+}
+
+# The fallback cache policy, looked up by name so it resolves in every partition.
+data "aws_cloudfront_cache_policy" "caching_optimized" {
+  name = "Managed-CachingOptimized"
 }
 
 resource "aws_cloudfront_origin_access_control" "this" {
@@ -76,7 +88,7 @@ resource "aws_cloudfront_distribution" "this" {
     cached_methods         = var.default_behaviour.cached_methods
     compress               = var.default_behaviour.compress
 
-    cache_policy_id            = var.default_behaviour.cache_policy_id
+    cache_policy_id            = var.default_behaviour.cache_policy_id != null ? var.default_behaviour.cache_policy_id : data.aws_cloudfront_cache_policy.caching_optimized.id
     origin_request_policy_id   = var.default_behaviour.origin_request_policy_id
     response_headers_policy_id = var.default_behaviour.response_headers_policy_id
 
@@ -91,7 +103,7 @@ resource "aws_cloudfront_distribution" "this" {
   }
 
   dynamic "ordered_cache_behavior" {
-    for_each = { for key, behaviour in var.ordered_behaviours : key => behaviour }
+    for_each = local.ordered_behaviours
 
     content {
       path_pattern           = ordered_cache_behavior.value.path_pattern
@@ -101,7 +113,7 @@ resource "aws_cloudfront_distribution" "this" {
       cached_methods         = ordered_cache_behavior.value.cached_methods
       compress               = ordered_cache_behavior.value.compress
 
-      cache_policy_id            = ordered_cache_behavior.value.cache_policy_id
+      cache_policy_id            = ordered_cache_behavior.value.cache_policy_id != null ? ordered_cache_behavior.value.cache_policy_id : data.aws_cloudfront_cache_policy.caching_optimized.id
       origin_request_policy_id   = ordered_cache_behavior.value.origin_request_policy_id
       response_headers_policy_id = ordered_cache_behavior.value.response_headers_policy_id
     }

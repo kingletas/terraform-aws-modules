@@ -13,11 +13,4 @@ resource "aws_ssm_parameter" "this" {
   overwrite       = var.overwrite_existing
 
   tags = merge(var.tags, { Name = each.key })
-
-  lifecycle {
-    precondition {
-      condition     = contains(keys(nonsensitive(var.values)), each.key)
-      error_message = format("No value was given for parameter %s.", each.key)
-    }
-  }
 }

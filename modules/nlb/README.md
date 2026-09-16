@@ -6,7 +6,7 @@ A network load balancer, for TCP and TLS traffic that an application load balanc
 
 ```hcl
 module "internal" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/nlb?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/nlb?ref=v0.3.0"
 
   name       = "platform-internal"
   vpc_id     = module.vpc.vpc_id
@@ -35,6 +35,8 @@ module "internal" {
 - **A network load balancer created without security groups can never be given one.** The association is fixed at creation, so pass `security_group_ids` even if the list is provisional.
 - `preserve_client_ip` changes what the target sees as the source address. It is on by default for instance targets and off for IP targets, and switching it can break a target's own allow-lists.
 - `enable_cross_zone_load_balancing` is off by default in AWS and on here. It distributes traffic evenly and bills for cross-zone data transfer.
+- `name` must be 2 to 32 letters, digits or hyphens, and cannot start or end with a hyphen. The plan checks this.
+- **Target group names are generated**: the load balancer name and the target group key, cut to fit, plus a short hash of the key, VPC, port, protocol and target type. Changing any of those creates the new target group under a new name before the old one is destroyed, so the listener moves across without a name collision.
 - Health checks default to TCP, which only proves something is listening. Use HTTP with a path where the target can serve one.
 
 <!-- BEGIN_TF_DOCS -->

@@ -93,6 +93,18 @@ variable "policy_json" {
   }
 }
 
+variable "sending_services" {
+  type        = list(string)
+  description = "Service principals allowed to send to the queue, such as cloudwatch.amazonaws.com, limited to this account by aws:SourceAccount. Merged into policy_json when attach_policy is on; the Sid AllowServiceSend is reserved."
+  default     = []
+}
+
+variable "sending_source_arns" {
+  type        = list(string)
+  description = "Source ARNs the sending_services are further limited to, by aws:SourceArn. Empty allows any source in this account."
+  default     = []
+}
+
 variable "tags" {
   type        = map(string)
   description = "Tags applied to every resource this module creates."

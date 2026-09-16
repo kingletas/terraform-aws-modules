@@ -35,16 +35,22 @@ variable "internal" {
   default     = false
 }
 
+variable "create_https_listener" {
+  type        = bool
+  description = "Create the HTTPS listener on port 443, which needs certificate_arn. Turning it off leaves an HTTP listener only, which you should not do in production."
+  default     = true
+}
+
 variable "certificate_arn" {
   type        = string
-  description = "ACM certificate for the HTTPS listener. Null creates an HTTP listener only, which you should not do in production."
+  description = "ACM certificate for the HTTPS listener. Required while create_https_listener is on."
   default     = null
 }
 
 variable "additional_certificate_arns" {
-  type        = list(string)
-  description = "Extra certificates on the HTTPS listener, for serving several host names."
-  default     = []
+  type        = map(string)
+  description = "Extra certificates on the HTTPS listener, keyed by a stable name so the ARNs may be unknown until apply."
+  default     = {}
 }
 
 variable "ssl_policy" {
@@ -53,9 +59,15 @@ variable "ssl_policy" {
   default     = "ELBSecurityPolicy-TLS13-1-2-2021-06"
 }
 
+variable "create_http_listener" {
+  type        = bool
+  description = "Create the port 80 listener. Turn it off when nothing can reach port 80, such as a load balancer that accepts only HTTPS from CloudFront."
+  default     = true
+}
+
 variable "redirect_http_to_https" {
   type        = bool
-  description = "Answer plain HTTP with a permanent redirect to HTTPS. Ignored without a certificate."
+  description = "Answer plain HTTP with a permanent redirect to HTTPS. Ignored while create_https_listener is off."
   default     = true
 }
 
@@ -87,7 +99,27 @@ variable "target_groups" {
 
 variable "default_target_group" {
   type        = string
-  description = "Which target group receives traffic that matches no listener rule."
+  description = "Which target group receives traffic that matches no listener rule. Ignored when default_fixed_response is set."
+  default     = null
+}
+
+variable "default_fixed_response" {
+  type = object({
+    status_code  = optional(number, 403)
+    content_type = optional(string, "text/plain")
+    message_body = optional(string)
+  })
+  description = "Answer traffic that matches no listener rule with a fixed response instead of forwarding it. With an http_headers rule, this refuses any request not carrying a shared origin header."
+  default     = null
+
+  validation {
+    condition = var.default_fixed_response == null || (
+      can(regex("^[2-5][0-9][0-9]$", tostring(var.default_fixed_response.status_code)))
+      && contains(["text/plain", "text/css", "text/html", "application/javascript", "application/json"], var.default_fixed_response.content_type)
+      && (var.default_fixed_response.message_body == null ? true : length(var.default_fixed_response.message_body) <= 1024)
+    )
+    error_message = "The default_fixed_response needs a 2XX-5XX status_code, a content_type ELB accepts, and a message_body of at most 1024 characters."
+  }
 }
 
 variable "listener_rules" {
@@ -98,8 +130,16 @@ variable "listener_rules" {
     path_patterns = optional(list(string))
     http_headers  = optional(map(list(string)))
   }))
-  description = "Rules on the HTTPS listener, keyed by a stable name. Lower priority numbers are evaluated first."
+  description = "Rules on the HTTPS listener, keyed by a stable name. Lower priority numbers are evaluated first. Each needs at least one of host_headers, path_patterns or http_headers."
   default     = {}
+
+  validation {
+    condition = alltrue([
+      for rule in values(var.listener_rules) :
+      length(coalesce(rule.host_headers, [])) + length(coalesce(rule.path_patterns, [])) + length(coalesce(rule.http_headers, {})) > 0
+    ])
+    error_message = "Every listener rule needs at least one condition: host_headers, path_patterns or http_headers."
+  }
 }
 
 variable "access_logs" {

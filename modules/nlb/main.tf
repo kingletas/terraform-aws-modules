@@ -1,5 +1,14 @@
 locals {
   tags = merge(var.tags, { Name = var.name })
+
+  # A replacement gets a new name, so create_before_destroy never collides with the group it replaces.
+  target_group_names = {
+    for key, group in var.target_groups : key => format(
+      "%s-%s",
+      replace(substr(replace(format("%s-%s", var.name, key), "/[^a-zA-Z0-9-]/", "-"), 0, 25), "/-+$/", ""),
+      substr(sha1(jsonencode([key, var.vpc_id, group.port, group.protocol, group.target_type])), 0, 6)
+    )
+  }
 }
 
 resource "aws_lb" "this" {
@@ -37,7 +46,7 @@ resource "aws_lb" "this" {
 resource "aws_lb_target_group" "this" {
   for_each = var.target_groups
 
-  name        = substr(format("%s-%s", var.name, each.key), 0, 32)
+  name        = local.target_group_names[each.key]
   vpc_id      = var.vpc_id
   port        = each.value.port
   protocol    = each.value.protocol

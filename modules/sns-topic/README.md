@@ -6,7 +6,7 @@ A topic and its subscriptions, for fanning one message out to queues, functions 
 
 ```hcl
 module "alerts" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/sns-topic?ref=v0.1.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/sns-topic?ref=v0.3.0"
 
   name       = "platform-alerts"
   kms_key_id = module.kms.key_id
@@ -31,6 +31,8 @@ module "alerts" {
 - **An email or SMS subscription does not deliver until its owner confirms it.** Terraform reports the subscription as created either way, so a new alert route can look wired up and be silently inert.
 - `raw_message_delivery` sends the message body alone. Without it, an SQS consumer receives the body wrapped in SNS metadata.
 - A FIFO topic can only be subscribed to by FIFO queues.
+- **An AWS service that publishes to the topic needs a topic policy grant.** List it in `publishing_services`, such as `["events.amazonaws.com"]`. The grant is limited to sources in this account by `aws:SourceAccount`, and to `publishing_source_arns` when you set it. It is merged with `policy_json` when `attach_policy` is on. The Sid `AllowServicePublish` is reserved.
+- **An encrypted topic silently drops messages from a service that cannot use its key.** CloudWatch alarms and EventBridge are the usual cases: give the key `delivery_service_principals = ["cloudwatch.amazonaws.com", "events.amazonaws.com"]` in the `kms-key` module.
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements
@@ -67,6 +69,8 @@ module "alerts" {
 | delivery\_policy\_json | Delivery retry policy as JSON. Null uses the SNS defaults. | `string` | `null` | no |
 | attach\_policy | Attach policy\_json as a resource policy. A bool rather than a null check, because a policy naming a resource in the same plan is not known to exist until apply. | `bool` | `false` | no |
 | policy\_json | Topic policy document. Null leaves publishing to IAM identities with explicit permission. | `string` | `null` | no |
+| publishing\_services | Service principals allowed to publish to the topic, such as cloudwatch.amazonaws.com, limited to this account by aws:SourceAccount. Merged into policy\_json when attach\_policy is on; the Sid AllowServicePublish is reserved. | `list(string)` | `[]` | no |
+| publishing\_source\_arns | Source ARNs the publishing\_services are further limited to, by aws:SourceArn. Empty allows any source in this account. | `list(string)` | `[]` | no |
 | tags | Tags applied to the topic. | `map(string)` | `{}` | no |
 
 ### Outputs

@@ -25,6 +25,11 @@ variable "values" {
   type        = map(string)
   description = "Parameter values, keyed by the same paths as `parameters`. Kept separate so the map itself can be marked sensitive without making every path a secret."
   sensitive   = true
+
+  validation {
+    condition     = alltrue([for path in keys(var.parameters) : contains(keys(nonsensitive(var.values)), path)])
+    error_message = format("No value was given for: %s.", join(", ", [for path in keys(var.parameters) : path if !contains(keys(nonsensitive(var.values)), path)]))
+  }
 }
 
 variable "kms_key_arn" {

@@ -1,6 +1,11 @@
 variable "name" {
   type        = string
   description = "Name for the load balancer. AWS caps this at 32 characters."
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9][a-zA-Z0-9-]{0,30}[a-zA-Z0-9]$", var.name))
+    error_message = "The name must be 2-32 alphanumeric characters or hyphens, and may not start or end with a hyphen."
+  }
 }
 
 variable "vpc_id" {

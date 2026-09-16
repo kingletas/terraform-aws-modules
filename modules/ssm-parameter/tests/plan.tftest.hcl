@@ -13,3 +13,14 @@ run "plans_with_real_values" {
     values     = { "/plan/test/level" = "info", "/plan/test/secret" = "not-a-real-secret" }
   }
 }
+
+run "refuses_a_parameter_with_no_value" {
+  command = plan
+
+  variables {
+    parameters = { "/plan/test/level" = { description = "log level" }, "/plan/test/secret" = { type = "SecureString" } }
+    values     = { "/plan/test/level" = "info" }
+  }
+
+  expect_failures = [var.values]
+}

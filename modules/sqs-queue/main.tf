@@ -1,4 +1,6 @@
 locals {
+  service_grant = length(var.sending_services) > 0
+
   suffix     = var.fifo_queue ? ".fifo" : ""
   queue_name = format("%s%s", trimsuffix(var.name, ".fifo"), local.suffix)
   dlq_name   = format("%s-dlq%s", trimsuffix(var.name, ".fifo"), local.suffix)
@@ -54,9 +56,46 @@ resource "aws_sqs_queue_redrive_allow_policy" "dead_letter" {
   })
 }
 
+data "aws_caller_identity" "current" {}
+
+# The named services may send only from this account, and only from the named source ARNs when there are any.
+data "aws_iam_policy_document" "this" {
+  count = local.service_grant ? 1 : 0
+
+  source_policy_documents = var.attach_policy ? [var.policy_json] : []
+
+  statement {
+    sid       = "AllowServiceSend"
+    effect    = "Allow"
+    actions   = ["sqs:SendMessage"]
+    resources = [aws_sqs_queue.this.arn]
+
+    principals {
+      type        = "Service"
+      identifiers = var.sending_services
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+
+    dynamic "condition" {
+      for_each = length(var.sending_source_arns) > 0 ? [var.sending_source_arns] : []
+
+      content {
+        test     = "ArnLike"
+        variable = "aws:SourceArn"
+        values   = condition.value
+      }
+    }
+  }
+}
+
 resource "aws_sqs_queue_policy" "this" {
-  count = var.attach_policy ? 1 : 0
+  count = var.attach_policy || local.service_grant ? 1 : 0
 
   queue_url = aws_sqs_queue.this.id
-  policy    = var.policy_json
+  policy    = local.service_grant ? data.aws_iam_policy_document.this[0].json : var.policy_json
 }
