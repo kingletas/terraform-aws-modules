@@ -4,7 +4,7 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-09-15
 
 ### Added
 
@@ -50,4 +50,5 @@ The first release.
 - Encryption is on, public addresses are off and IMDSv2 is required, each with a variable to choose otherwise deliberately.
 - No module carries a provider block.
 
+[0.2.0]: https://github.com/kingletas/terraform-aws-modules/releases/tag/v0.2.0
 [0.1.0]: https://github.com/kingletas/terraform-aws-modules/releases/tag/v0.1.0
