@@ -9,7 +9,7 @@ run "plans_with_real_values" {
   command = plan
 
   variables {
-    partners         = { acme = { public_keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlanTestOnlyNotARealKeyAtAll plan-test"] } }
+    partners         = { acme = { public_keys = { primary = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlanTestOnlyNotARealKeyAtAll plan-test" } } }
     notify_on_upload = true
   }
 
@@ -39,8 +39,8 @@ run "plans_with_several_partners" {
 
   variables {
     partners = {
-      acme            = { public_keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlanTestOnlyNotARealKeyAtAll plan-test"] }
-      globex-readonly = { public_keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlanTestOnlyNotARealKeyAtAll plan-test"], read_only = true }
+      acme            = { public_keys = { primary = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlanTestOnlyNotARealKeyAtAll plan-test" } }
+      globex-readonly = { public_keys = { primary = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPlanTestOnlyNotARealKeyAtAll plan-test" }, read_only = true }
     }
   }
 

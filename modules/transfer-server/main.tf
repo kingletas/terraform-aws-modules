@@ -199,11 +199,13 @@ resource "aws_transfer_user" "this" {
   tags = merge(var.tags, { Name = each.key })
 }
 
+# Keyed "username/key_name", so rotating one key leaves every other key alone
+# and a key that moves between users can be named in a moved block.
 resource "aws_transfer_ssh_key" "this" {
   for_each = merge([
     for username, user in var.users : {
-      for index, key in user.public_keys :
-      format("%s-%d", username, index) => { username = username, body = key }
+      for key_name, key in user.public_keys :
+      format("%s/%s", username, key_name) => { username = username, body = key }
     }
   ]...)
 

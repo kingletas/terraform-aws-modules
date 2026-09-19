@@ -68,13 +68,13 @@ variable "bucket_name" {
 
 variable "users" {
   type = map(object({
-    public_keys    = list(string)
+    public_keys    = map(string)
     home_directory = optional(string)
     read_only      = optional(bool, false)
     posix_uid      = optional(number)
     posix_gid      = optional(number)
   }))
-  description = "Users keyed by username. Each is confined to its home directory in the bucket, which defaults to a prefix named after the user, and cannot see anything above it."
+  description = "Users keyed by username. Each user's public_keys are keyed by a name you choose, such as \"2026-rotation\", which becomes part of the key's resource address. Each user is confined to its home directory in the bucket, which defaults to a prefix named after the user, and cannot see anything above it."
   default     = {}
 
   validation {
@@ -82,6 +82,17 @@ variable "users" {
       for username, user in var.users : user.home_directory == null || (trim(coalesce(user.home_directory, "-"), "/") != "" && !strcontains(coalesce(user.home_directory, "-"), ".."))
     ])
     error_message = "A home_directory must name a prefix below the bucket root and cannot contain \"..\"."
+  }
+
+  # A key's address is "username/key_name", so a name carrying the separator could
+  # collide with another user's key and merge would silently drop one of them.
+  validation {
+    condition = alltrue([
+      for username, user in var.users : alltrue([
+        for key_name in keys(user.public_keys) : trimspace(key_name) != "" && !strcontains(key_name, "/")
+      ])
+    ])
+    error_message = "A public key name must not be empty and cannot contain \"/\"."
   }
 }
 

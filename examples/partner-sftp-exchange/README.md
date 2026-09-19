@@ -35,6 +35,7 @@ graph LR
 - AWS credentials for the target account, and Terraform 1.9 or later.
 - **Each partner's SSH public key.** Password authentication is not available, so you cannot create a partner without one.
 - **A username per partner.** The username is also the partner's directory in the bucket, and the key in the `partners` map.
+- **A name for each SSH key**, such as `primary`. It is the key's address in Terraform, so keep it stable once the key is in use.
 
 ## How to use it
 
@@ -72,7 +73,7 @@ The `.tf` files call modules by relative path (`../../modules/<name>`). If you c
 
 | Variable | Default | Why you would change it |
 |---|---|---|
-| `partners` | none, required | Partners keyed by username. Each takes `public_keys`, and `read_only = true` for a partner that only downloads |
+| `partners` | none, required | Partners keyed by username. Each takes `public_keys`, itself keyed by a name you choose, and `read_only = true` for a partner that only downloads |
 | `retention_days` | `365` | How long a delivered file stays before it expires |
 | `archive_after_days` | `30` | When files move to Standard-IA. `0` keeps everything in standard storage |
 | `notify_on_upload` | `false` | Alarm when no files arrive for 24 hours. See below before turning it on |
@@ -95,7 +96,20 @@ Adding a partner is one map entry:
 ```hcl
 partners = {
   acme = {
-    public_keys = ["ssh-ed25519 AAAAC3Nza... acme-integration"]
+    public_keys = { primary = "ssh-ed25519 AAAAC3Nza... acme-integration" }
+  }
+}
+```
+
+Each key is named, and the name is part of its address. To rotate a partner's key without interrupting them, add the new one under a second name, wait for the partner to switch, then remove the old entry:
+
+```hcl
+partners = {
+  acme = {
+    public_keys = {
+      primary       = "ssh-ed25519 AAAAC3Nza... acme-integration"
+      "2026-rotate" = "ssh-ed25519 AAAAC3Nza... acme-new"
+    }
   }
 }
 ```

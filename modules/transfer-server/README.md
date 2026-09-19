@@ -13,10 +13,10 @@ module "sftp" {
 
   users = {
     partner-acme = {
-      public_keys = [file("keys/acme.pub")]
+      public_keys = { primary = file("keys/acme.pub") }
     }
     partner-readonly = {
-      public_keys = [file("keys/readonly.pub")]
+      public_keys = { primary = file("keys/readonly.pub") }
       read_only   = true
     }
   }
@@ -30,6 +30,7 @@ Every user gets its own IAM role and a logical home directory. It maps to `s3://
 ## Notes
 
 - **Public keys only.** Service-managed identity has no password authentication, which is the right answer for a partner integration.
+- **Name each public key.** `public_keys` is keyed by a name you choose, and each key is addressed as `username/key_name`. Adding a second key under a new name leaves the first one in place, which is how a rotation is done: add the new key, have the partner switch, then remove the old entry. Renaming a key replaces it.
 - **Plain `FTP` is unencrypted** and should never be in `protocols` on a public endpoint. `FTPS` needs a certificate.
 - `address_allocation_ids` gives the server fixed Elastic IPs, which is what a partner's firewall team will ask for. It needs `endpoint_type = "VPC"`.
 - `home_directory` must name a prefix below the bucket root and cannot contain `..`. The plan fails otherwise.
@@ -77,7 +78,7 @@ Every user gets its own IAM role and a logical home directory. It maps to `s3://
 | certificate\_arn | ACM certificate. Required when FTPS is in the protocol list. | `string` | `null` | no |
 | security\_policy\_name | Cryptographic policy governing which ciphers and key exchanges are offered. | `string` | `"TransferSecurityPolicy-2025-03"` | no |
 | bucket\_name | S3 bucket users are given access to. | `string` | n/a | yes |
-| users | Users keyed by username. Each is confined to its home directory in the bucket, which defaults to a prefix named after the user, and cannot see anything above it. | <pre>map(object({<br/>    public_keys    = list(string)<br/>    home_directory = optional(string)<br/>    read_only      = optional(bool, false)<br/>    posix_uid      = optional(number)<br/>    posix_gid      = optional(number)<br/>  }))</pre> | `{}` | no |
+| users | Users keyed by username. Each user's public\_keys are keyed by a name you choose, such as "2026-rotation", which becomes part of the key's resource address. Each user is confined to its home directory in the bucket, which defaults to a prefix named after the user, and cannot see anything above it. | <pre>map(object({<br/>    public_keys    = map(string)<br/>    home_directory = optional(string)<br/>    read_only      = optional(bool, false)<br/>    posix_uid      = optional(number)<br/>    posix_gid      = optional(number)<br/>  }))</pre> | `{}` | no |
 | log\_retention\_days | Days to keep transfer logs. These are the record of who moved which file. | `number` | `365` | no |
 | kms\_key\_arn | KMS key encrypting the log group. | `string` | `null` | no |
 | bucket\_kms\_key | Customer-managed KMS key encrypting the bucket. Users are granted kms:Decrypt, and kms:GenerateDataKey when they can write, through S3 only. Null for a bucket using S3-managed keys. | <pre>object({<br/>    arn = string<br/>  })</pre> | `null` | no |

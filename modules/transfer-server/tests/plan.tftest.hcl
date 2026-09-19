@@ -17,11 +17,14 @@ run "scopes_each_user_to_its_home_directory" {
 
     users = {
       partner-acme = {
-        public_keys    = ["ssh-ed25519 AAAAplan-test-placeholder partner-acme"]
+        public_keys = {
+          primary  = "ssh-ed25519 AAAAplan-test-placeholder partner-acme"
+          rotation = "ssh-ed25519 AAAAplan-test-placeholder partner-acme-next"
+        }
         home_directory = "/inbound/acme/"
       }
       partner-readonly = {
-        public_keys = ["ssh-ed25519 AAAAplan-test-placeholder partner-readonly"]
+        public_keys = { primary = "ssh-ed25519 AAAAplan-test-placeholder partner-readonly" }
         read_only   = true
       }
     }
@@ -51,6 +54,16 @@ run "scopes_each_user_to_its_home_directory" {
     condition     = one([for statement in data.aws_iam_policy_document.user["partner-readonly"].statement : statement.actions if statement.sid == "UseBucketKeyThroughS3"]) == toset(["kms:Decrypt"])
     error_message = "A read-only user should only be able to decrypt."
   }
+
+  assert {
+    condition     = toset(keys(aws_transfer_ssh_key.this)) == toset(["partner-acme/primary", "partner-acme/rotation", "partner-readonly/primary"])
+    error_message = "Each key should be addressed by its user and the name the caller gave it."
+  }
+
+  assert {
+    condition     = aws_transfer_ssh_key.this["partner-acme/rotation"].user_name == "partner-acme"
+    error_message = "A key should be attached to the user whose map it came from."
+  }
 }
 
 run "grants_no_key_without_one" {
@@ -59,7 +72,7 @@ run "grants_no_key_without_one" {
   variables {
     users = {
       partner-acme = {
-        public_keys = ["ssh-ed25519 AAAAplan-test-placeholder partner-acme"]
+        public_keys = { primary = "ssh-ed25519 AAAAplan-test-placeholder partner-acme" }
       }
     }
   }
@@ -76,8 +89,22 @@ run "refuses_a_home_directory_at_the_bucket_root" {
   variables {
     users = {
       partner-acme = {
-        public_keys    = ["ssh-ed25519 AAAAplan-test-placeholder partner-acme"]
+        public_keys    = { primary = "ssh-ed25519 AAAAplan-test-placeholder partner-acme" }
         home_directory = "/"
+      }
+    }
+  }
+
+  expect_failures = [var.users]
+}
+
+run "refuses_a_key_name_carrying_the_address_separator" {
+  command = plan
+
+  variables {
+    users = {
+      partner-acme = {
+        public_keys = { "acme/primary" = "ssh-ed25519 AAAAplan-test-placeholder partner-acme" }
       }
     }
   }

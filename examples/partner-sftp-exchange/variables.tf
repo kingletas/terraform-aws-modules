@@ -18,10 +18,10 @@ variable "environment" {
 
 variable "partners" {
   type = map(object({
-    public_keys = list(string)
+    public_keys = map(string)
     read_only   = optional(bool, false)
   }))
-  description = "Partners keyed by username. Each is confined to its own prefix in the bucket."
+  description = "Partners keyed by username, each with public keys keyed by a name you choose. Each partner is confined to its own prefix in the bucket."
 }
 
 variable "retention_days" {

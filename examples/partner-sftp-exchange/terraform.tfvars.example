@@ -6,11 +6,11 @@ environment = "production"
 
 partners = {
   acme = {
-    public_keys = ["ssh-ed25519 AAAAC3Nza... acme-integration"]
+    public_keys = { primary = "ssh-ed25519 AAAAC3Nza... acme-integration" }
   }
 
   globex-readonly = {
-    public_keys = ["ssh-ed25519 AAAAC3Nza... globex-pull"]
+    public_keys = { primary = "ssh-ed25519 AAAAC3Nza... globex-pull" }
     read_only   = true
   }
 }
