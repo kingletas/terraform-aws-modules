@@ -1,0 +1,4 @@
+output "rule_ids" {
+  description = "Security group rule identifiers, keyed as the rules are."
+  value       = { for key, rule in aws_vpc_security_group_ingress_rule.this : key => rule.id }
+}

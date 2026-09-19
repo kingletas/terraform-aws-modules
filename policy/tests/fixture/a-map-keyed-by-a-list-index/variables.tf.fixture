@@ -1,0 +1,4 @@
+variable "client_cidrs" {
+  type        = list(string)
+  description = "One inbound rule per entry."
+}

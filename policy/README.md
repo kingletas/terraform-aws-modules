@@ -16,6 +16,7 @@ checkov and tflint judge the infrastructure the modules build: whether a bucket 
 | Every required provider states a version | The provider version floats, and two checkouts resolve differently |
 | A module states a range, not a pin | A module that pins decides for every caller, and two pinned modules cannot be composed |
 | `count` is not set to a length | `count` renumbers every element after a removal, so deleting one rebuilds the rest |
+| A map is not keyed by the index of a list | The key becomes a resource address wherever the map reaches a `for_each`, on the resource or through a module input, so removing one element rebuilds every element after it |
 | Existence is not decided by a null string | Terraform cannot know a value from another resource is non-null until apply, so the plan fails exactly when the value comes from the same plan |
 | A credential-shaped string variable is `sensitive` | An unmarked value is printed in plan output and in CI logs |
 | Every module has `versions.tf`, `variables.tf` and `outputs.tf` | A reader has to search for what should always be in the same three places |

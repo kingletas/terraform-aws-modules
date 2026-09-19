@@ -6,7 +6,13 @@ locals {
   availability_zones = coalesce(var.availability_zones, slice(data.aws_availability_zones.available.names, 0, 2))
   prefix             = format("%s-%s", var.name, var.environment)
 
-  all_cidrs = concat([var.shared_vpc_cidr], [for name, spoke in var.spokes : spoke.cidr_block])
+  # Every network allowed to reach the shared endpoints, keyed by name so that
+  # removing one spoke leaves the other rules alone. The spoke keys carry a
+  # prefix, so no spoke name can collide with the shared VPC's own entry.
+  endpoint_clients = merge(
+    { shared = var.shared_vpc_cidr },
+    { for name, spoke in var.spokes : format("spoke-%s", name) => spoke.cidr_block },
+  )
 
   # True when at least one spoke has no NAT gateway and so egresses through the hub.
   egress_through_hub = anytrue([for name, spoke in var.spokes : !spoke.enable_nat_gateway])
@@ -264,7 +270,7 @@ module "endpoint_sg" {
   vpc_id      = module.shared_vpc.vpc_id
 
   ingress_rules = {
-    for index, cidr in local.all_cidrs : format("net%d", index) => {
+    for network, cidr in local.endpoint_clients : network => {
       description = format("HTTPS from %s", cidr)
       ip_protocol = "tcp"
       from_port   = 443

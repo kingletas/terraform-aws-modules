@@ -83,6 +83,32 @@ deny contains msg if {
 	msg := sprintf("%s: %s.%s.%s counts a length. count renumbers every element after a removal, which turns one deletion into a rebuild. Key a for_each by name instead.", [block.path, block.kind, block.type, block.name])
 }
 
+# --- a map is not keyed by the index of a list ---
+#
+# A key becomes a resource address once the map reaches a for_each, on the
+# resource or through a module input, so `for index, cidr in local.cidrs :
+# format("net%d", index) => ...` re-addresses every entry after a removal.
+#
+# The test is the iteration variable's name, which is how a list index is
+# spelled; a comprehension over a map binds the key and is not flagged. The
+# match stops at the first `=`, so the rule misses more than it invents.
+
+index_name := ["index", "idx", "i", "position"]
+
+keyed_by_index(expression) if {
+	some name in index_name
+	regex.match(sprintf(`for\s+%s\s*,\s*\w+\s+in\b[^=]*\b%s\b[^=]*=>`, [name, name]), expression)
+}
+
+deny contains msg if {
+	some file in files
+	walk(file.contents, [path, expression])
+	is_string(expression)
+	keyed_by_index(expression)
+	where := concat(".", [part | some part in path; is_string(part)])
+	msg := sprintf("%s: %s is keyed by the index of a list. A key becomes a resource address, and an index re-numbers every entry after a removal, so deleting one rebuilds the rest. Key by a name the caller chooses.", [file.path, where])
+}
+
 # --- existence is decided by a bool or an object, never by a null string ---
 
 string_variable contains variable.name if {
