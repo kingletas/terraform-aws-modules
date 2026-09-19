@@ -44,8 +44,8 @@ output "database_secret_arn" {
 }
 
 output "service_credential_parameters" {
-  description = "SSM SecureString parameters holding the Valkey auth token and the OpenSearch master password, by name. The values are not in any output."
-  value       = local.service_credential_paths
+  description = "SSM SecureString parameters holding the Valkey auth token and the OpenSearch master password: the path of each, keyed by the short name the configuration uses. The parameter values are not in any output."
+  value       = module.service_credentials.names
 }
 
 output "ansible_inventory" {

@@ -98,9 +98,9 @@ variable "static_routes" {
 }
 
 variable "share_with_principals" {
-  type        = list(string)
-  description = "Account IDs or organization ARNs to share the gateway with through Resource Access Manager."
-  default     = []
+  type        = map(string)
+  description = "Account IDs or organization ARNs to share the gateway with through Resource Access Manager, keyed by a stable name. The keys must be known at plan, so an account created in the same configuration can be shared with; its ID need not be."
+  default     = {}
 }
 
 variable "tags" {

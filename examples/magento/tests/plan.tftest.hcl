@@ -102,8 +102,14 @@ run "plans_with_real_values" {
   }
 
   assert {
-    condition     = toset(keys(module.service_credentials.names)) == toset(["/storefront-staging/cache/auth-token", "/storefront-staging/search/master-password"])
+    condition     = toset(values(module.service_credentials.names)) == toset(["/storefront-staging/cache/auth-token", "/storefront-staging/search/master-password"])
     error_message = "The Valkey token and the OpenSearch master password must each be stored in a parameter."
+  }
+
+  # The keys are what a moved block has to name, so they must not carry the environment.
+  assert {
+    condition     = toset(keys(module.service_credentials.names)) == toset(["cache/auth-token", "search/master-password"])
+    error_message = "Each credential parameter must be addressed by a short name that does not change with the environment."
   }
 
   assert {

@@ -60,7 +60,7 @@ static_routes = {
 
 - A transit gateway is billed per attachment per hour plus per gigabyte, which is more than peering. It buys transitive routing and central control.
 - `amazon_side_asn` cannot be changed after creation.
-- Sharing through Resource Access Manager lets other accounts attach their own VPCs.
+- Sharing through Resource Access Manager lets other accounts attach their own VPCs. Principals are keyed by a name you choose rather than by the account ID, so an account created in the same configuration can be shared with, and removing one principal does not disturb the others.
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements
@@ -105,7 +105,7 @@ static_routes = {
 | vpc\_attachments | VPC attachments keyed by a stable name. Use one subnet per availability zone you want reachable. route\_table\_key names the one table an attachment is associated with, and cannot be combined with default\_route\_table\_association. | <pre>map(object({<br/>    vpc_id              = string<br/>    subnet_ids          = list(string)<br/>    appliance_mode      = optional(bool, false)<br/>    dns_support         = optional(bool, true)<br/>    route_table_key     = optional(string)<br/>    propagate_to_tables = optional(list(string), [])<br/>  }))</pre> | `{}` | no |
 | route\_tables | Route tables keyed by a stable name, with a description as the value. Segmentation is what a transit gateway is for. | `map(string)` | `{}` | no |
 | static\_routes | Static routes keyed by a stable name. A route forwards to the attachment named by attachment\_key, or is a blackhole that drops traffic and names no attachment. | <pre>map(object({<br/>    route_table_key        = string<br/>    destination_cidr_block = string<br/>    attachment_key         = optional(string)<br/>    blackhole              = optional(bool, false)<br/>  }))</pre> | `{}` | no |
-| share\_with\_principals | Account IDs or organization ARNs to share the gateway with through Resource Access Manager. | `list(string)` | `[]` | no |
+| share\_with\_principals | Account IDs or organization ARNs to share the gateway with through Resource Access Manager, keyed by a stable name. The keys must be known at plan, so an account created in the same configuration can be shared with; its ID need not be. | `map(string)` | `{}` | no |
 | tags | Tags applied to every resource this module creates. | `map(string)` | `{}` | no |
 
 ### Outputs

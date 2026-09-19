@@ -32,6 +32,7 @@ AWS refuses to create a key whose policy would lock out the identity creating it
 - An SNS topic encrypted with this key drops messages from CloudWatch alarms and EventBridge unless those services can use the key. Put `cloudwatch.amazonaws.com` or `events.amazonaws.com` in `delivery_service_principals`, which grants only `kms:Decrypt` and `kms:GenerateDataKey*` for requests from this account.
 - `deletion_window_in_days` is the only window in which a scheduled deletion can be cancelled. Seven days is short for a key protecting production data.
 - Rotation applies to symmetric keys only. It rotates the backing material; the key ID and every ciphertext stay valid.
+- Extra `aliases` are keyed by a name you choose. The key becomes part of the resource address, so keeping it a literal lets an alias that already exists be adopted with a `moved` block instead of being recreated.
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements
@@ -73,7 +74,7 @@ AWS refuses to create a key whose policy would lock out the identity creating it
 | service\_principals | AWS service principals allowed to encrypt, decrypt and describe with the key, such as logs.us-east-1.amazonaws.com. Granted when the request comes from this account; a CloudWatch Logs principal only for log groups in this account. | `list(string)` | `[]` | no |
 | delivery\_service\_principals | AWS services that deliver to a resource encrypted with this key, such as cloudwatch.amazonaws.com for alarms or events.amazonaws.com for EventBridge publishing to an SNS topic. Granted kms:Decrypt and kms:GenerateDataKey* when the request comes from this account. | `list(string)` | `[]` | no |
 | policy\_json | A complete key policy, replacing the one this module builds. Use it when the generated policy is not enough. | `string` | `null` | no |
-| aliases | Extra aliases, without the alias/ prefix. | `list(string)` | `[]` | no |
+| aliases | Extra aliases, without the alias/ prefix, keyed by a stable name. The key is the address a `moved` block names, so keep it a literal rather than an alias built from a variable. | `map(string)` | `{}` | no |
 | tags | Tags applied to the key. | `map(string)` | `{}` | no |
 
 ### Outputs

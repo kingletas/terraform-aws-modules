@@ -112,31 +112,28 @@ resource "random_password" "search" {
 
 locals {
   search_master_user = "opensearch"
-
-  service_credential_paths = {
-    cache_auth_token = format("/%s/cache/auth-token", local.prefix)
-    search_password  = format("/%s/search/master-password", local.prefix)
-  }
 }
 
 # The generated credentials, readable by the nodes by parameter name.
 module "service_credentials" {
   source = "../../modules/ssm-parameter"
 
+  path_prefix = format("/%s", local.prefix)
+
   parameters = {
-    (local.service_credential_paths.cache_auth_token) = {
+    "cache/auth-token" = {
       type        = "SecureString"
       description = "Valkey auth token for the cache and the session handler"
     }
-    (local.service_credential_paths.search_password) = {
+    "search/master-password" = {
       type        = "SecureString"
       description = "OpenSearch master user password"
     }
   }
 
   values = {
-    (local.service_credential_paths.cache_auth_token) = random_password.cache.result
-    (local.service_credential_paths.search_password)  = random_password.search.result
+    "cache/auth-token"       = random_password.cache.result
+    "search/master-password" = random_password.search.result
   }
 
   kms_key_arn = module.kms.arn

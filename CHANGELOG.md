@@ -6,6 +6,16 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **`ssm-parameter`**: `parameters` and `values` are keyed by a short name under the new `path_prefix` instead of by the full path. Move the computed part of each path into `path_prefix` and leave the key a literal: `path_prefix = format("/%s/api", var.environment)` with `parameters = { "log-level" = {} }` writes `/staging/api/log-level` as before. A key may still contain slashes, so one call can cover a subtree. `arns`, `names` and `versions` are keyed by that name, and `names` now gives the full path as its value, which is what an application reads the parameter by; a caller that looked a path up in `names` should ask for the short name instead. Existing parameters are destroyed and recreated at the same paths on upgrade, because the resource address changes. The reason for the change is that a `moved` block may only name an address with a constant key, so a path built from a variable could not be written as one, and an existing parameter could not be adopted into the module without being replaced.
+- **`kms-key`**: `aliases` is a map keyed by a stable name instead of a list. Write `aliases = { legacy = "app-legacy" }`. Existing extra aliases are recreated on upgrade unless a `moved` block names the old and new keys.
+- **`transit-gateway`**: `share_with_principals` is a map keyed by a stable name instead of a list. Write `share_with_principals = { security = "123456789012" }`. Existing principal associations are recreated on upgrade. Keying by name also means an account created in the same configuration can be shared with: the list form put the account ID in the key, and an ID that does not exist until apply failed the plan.
+
+### Fixed
+
+- **`ssm-parameter`**: `names` reports the parameter's path rather than repeating its map key.
+
 ## [0.5.0] - 2026-09-16
 
 ### Added

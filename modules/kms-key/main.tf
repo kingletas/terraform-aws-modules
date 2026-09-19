@@ -200,7 +200,7 @@ resource "aws_kms_alias" "this" {
 }
 
 resource "aws_kms_alias" "extra" {
-  for_each = toset(var.aliases)
+  for_each = var.aliases
 
   name          = format("alias/%s", each.value)
   target_key_id = aws_kms_key.this.key_id

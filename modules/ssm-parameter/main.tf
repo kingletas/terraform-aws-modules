@@ -1,7 +1,13 @@
+locals {
+  # The caller keys the map on a short name, so the resource address is a literal
+  # a moved block can name. The full SSM path is built here instead.
+  paths = { for name in keys(var.parameters) : name => format("%s/%s", var.path_prefix, name) }
+}
+
 resource "aws_ssm_parameter" "this" {
   for_each = var.parameters
 
-  name        = each.key
+  name        = local.paths[each.key]
   value       = var.values[each.key]
   type        = each.value.type
   description = each.value.description
@@ -12,5 +18,5 @@ resource "aws_ssm_parameter" "this" {
   key_id          = each.value.type == "SecureString" ? var.kms_key_arn : null
   overwrite       = var.overwrite_existing
 
-  tags = merge(var.tags, { Name = each.key })
+  tags = merge(var.tags, { Name = local.paths[each.key] })
 }

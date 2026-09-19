@@ -101,10 +101,10 @@ locals {
     MAGENTO_DB_SECRET_ARN             = module.database.master_user_secret_arn
     MAGENTO_REDIS_HOST                = module.cache.primary_endpoint_address
     MAGENTO_REDIS_PORT                = tostring(module.cache.port)
-    MAGENTO_REDIS_AUTH_PARAMETER      = module.service_credentials.names[local.service_credential_paths.cache_auth_token]
+    MAGENTO_REDIS_AUTH_PARAMETER      = module.service_credentials.names["cache/auth-token"]
     MAGENTO_SEARCH_HOST               = module.search.endpoint
     MAGENTO_SEARCH_USER               = local.search_master_user
-    MAGENTO_SEARCH_PASSWORD_PARAMETER = module.service_credentials.names[local.service_credential_paths.search_password]
+    MAGENTO_SEARCH_PASSWORD_PARAMETER = module.service_credentials.names["search/master-password"]
     MAGENTO_MEDIA_FS                  = module.media.id
     MAGENTO_STATIC_BUCKET             = module.static_assets.id
     MAGENTO_FACTS_PARAMETER           = module.ansible.facts_parameter_name

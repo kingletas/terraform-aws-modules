@@ -39,11 +39,11 @@ module "ansible" {
 
     redis_host           = module.cache.primary_endpoint_address
     redis_port           = tostring(module.cache.port)
-    redis_auth_parameter = local.service_credential_paths.cache_auth_token
+    redis_auth_parameter = module.service_credentials.names["cache/auth-token"]
 
     search_host               = module.search.endpoint
     search_user               = local.search_master_user
-    search_password_parameter = local.service_credential_paths.search_password
+    search_password_parameter = module.service_credentials.names["search/master-password"]
 
     media_filesystem_id = module.media.id
     static_bucket       = module.static_assets.id

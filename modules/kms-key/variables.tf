@@ -96,9 +96,9 @@ variable "policy_json" {
 }
 
 variable "aliases" {
-  type        = list(string)
-  description = "Extra aliases, without the alias/ prefix."
-  default     = []
+  type        = map(string)
+  description = "Extra aliases, without the alias/ prefix, keyed by a stable name. The key is the address a `moved` block names, so keep it a literal rather than an alias built from a variable."
+  default     = {}
 }
 
 variable "tags" {
