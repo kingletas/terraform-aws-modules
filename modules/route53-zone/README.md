@@ -6,7 +6,7 @@ A hosted zone with its records and health checks, public or private.
 
 ```hcl
 module "zone" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/route53-zone?ref=v0.6.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/route53-zone?ref=v0.7.0"
 
   name = "example.com"
 

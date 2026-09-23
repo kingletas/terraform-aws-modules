@@ -8,7 +8,7 @@ Registering an existing key, which is the better path:
 
 ```hcl
 module "ssh_key" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/ssh-key-pair?ref=v0.6.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/ssh-key-pair?ref=v0.7.0"
 
   name       = "storefront-production"
   public_key = file("~/.ssh/id_ed25519.pub")
@@ -19,7 +19,7 @@ Generating one, where nobody has a key to hand:
 
 ```hcl
 module "ssh_key" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/ssh-key-pair?ref=v0.6.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/ssh-key-pair?ref=v0.7.0"
 
   name        = "storefront-staging"
   kms_key_arn = module.kms.arn

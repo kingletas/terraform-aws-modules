@@ -6,7 +6,7 @@ An ECS cluster with Container Insights and a log group recording every ECS Exec 
 
 ```hcl
 module "cluster" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/ecs-cluster?ref=v0.6.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/ecs-cluster?ref=v0.7.0"
 
   name        = "platform"
   kms_key_arn = module.kms.arn

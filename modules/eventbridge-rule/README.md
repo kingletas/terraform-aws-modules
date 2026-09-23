@@ -6,7 +6,7 @@ A rule and its targets, on a schedule or an event pattern.
 
 ```hcl
 module "nightly" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/eventbridge-rule?ref=v0.6.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/eventbridge-rule?ref=v0.7.0"
 
   name                = "nightly-reconciliation"
   schedule_expression = "cron(0 3 * * ? *)"

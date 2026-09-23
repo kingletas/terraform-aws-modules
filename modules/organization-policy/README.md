@@ -22,7 +22,7 @@ data "aws_iam_policy_document" "guardrails" {
 }
 
 module "guardrails" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/organization-policy?ref=v0.6.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/organization-policy?ref=v0.7.0"
 
   name        = "baseline-guardrails"
   description = "Things no account may do, including an administrator."

@@ -6,7 +6,7 @@ A WAF web ACL with AWS managed rule groups, rate limits and IP lists, logging wi
 
 ```hcl
 module "waf" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/waf-web-acl?ref=v0.6.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/waf-web-acl?ref=v0.7.0"
 
   name  = "platform-public"
   scope = "REGIONAL"

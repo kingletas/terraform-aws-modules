@@ -6,7 +6,7 @@ A function with a managed log group, optional X-Ray tracing, and its event sourc
 
 ```hcl
 module "processor" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/lambda-function?ref=v0.6.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/lambda-function?ref=v0.7.0"
 
   name     = "order-processor"
   role_arn = module.processor_role.arn

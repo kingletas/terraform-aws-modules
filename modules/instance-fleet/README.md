@@ -8,7 +8,7 @@ Where `ec2-instance` runs N identical instances, this runs a **fleet**: web node
 
 ```hcl
 module "fleet" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/instance-fleet?ref=v0.6.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/instance-fleet?ref=v0.7.0"
 
   name = "storefront-production"
 

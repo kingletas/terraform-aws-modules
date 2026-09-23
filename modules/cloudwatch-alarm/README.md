@@ -6,7 +6,7 @@ Alarms declared as a set, including metric maths, with a shared default action.
 
 ```hcl
 module "alarms" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/cloudwatch-alarm?ref=v0.6.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/cloudwatch-alarm?ref=v0.7.0"
 
   default_alarm_actions = [module.alerts.arn]
   default_ok_actions    = [module.alerts.arn]

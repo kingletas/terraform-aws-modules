@@ -8,7 +8,7 @@ Instances are named `name-01`, `name-02` and so on, and every output is keyed by
 
 ```hcl
 module "app" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/ec2-instance?ref=v0.6.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/ec2-instance?ref=v0.7.0"
 
   name           = "platform-app"
   instance_count = 3

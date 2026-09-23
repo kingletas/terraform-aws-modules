@@ -6,7 +6,7 @@ A launch template describing how an instance is built, for an autoscaling group 
 
 ```hcl
 module "app_template" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/launch-template?ref=v0.6.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/launch-template?ref=v0.7.0"
 
   name          = "platform-app"
   image_id      = data.aws_ami.amazon_linux.id

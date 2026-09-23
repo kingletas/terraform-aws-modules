@@ -70,7 +70,7 @@ make test DIR=examples/magento
 
 The tests plan both the staging defaults and production with the builder node.
 
-The `.tf` files call modules by relative path (`../../modules/<name>`). If you copy this example outside this repository, change each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.6.0`.
+The `.tf` files call modules by relative path (`../../modules/<name>`). If you copy this example outside this repository, change each `source` to `github.com/kingletas/terraform-aws-modules//modules/<name>?ref=v0.7.0`.
 
 ### Configure the nodes
 

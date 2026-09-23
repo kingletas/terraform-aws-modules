@@ -6,6 +6,10 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-23
+
+**Upgrading to 0.7.0 destroys and recreates running instances and their data volumes unless you prepare.** `ec2-instance` and `instance-fleet` change the keys their instances, extra EBS volumes, volume attachments and Elastic IPs are addressed by. On the first plan after upgrading, Terraform destroys each one at its old address and creates it again at the new one: a new server, an empty data volume where the old one held data, and a new public address for every Elastic IP. Read the plan before applying. Each entry below says how to keep the existing resources: a `moved` block where the old address is a literal you can write, and `terraform state mv`, run once per environment before the apply, where it is not. `secrets-manager-secret` also raises its Terraform and provider floor.
+
 ### Breaking changes
 
 - **`ec2-instance`**: instances are keyed by their ordinal instead of by their name, so `aws_instance.this["storefront-staging-01"]` becomes `aws_instance.this["01"]`, and extra volumes and their attachments become `["01-data"]` instead of `["storefront-staging-01-data"]`. The `Name` tags and every output keep the full name. **Without preparation the upgrade destroys and recreates every instance, its root volume and every extra EBS volume, with the data on it.** Where `name` is a literal in the calling configuration, add a `moved` block per address, such as `moved { from = module.web.aws_instance.this["storefront-staging-01"]  to = module.web.aws_instance.this["01"] }`. Where `name` is built from a variable shared across environments, a `moved` block cannot name the old address; run `terraform state mv 'module.web.aws_instance.this["storefront-staging-01"]' 'module.web.aws_instance.this["01"]'` in each environment before the apply, and the same for each `aws_ebs_volume.this` and `aws_volume_attachment.this`.
@@ -200,7 +204,8 @@ The first release.
 - Encryption is on, public addresses are off and IMDSv2 is required, each with a variable to choose otherwise deliberately.
 - No module carries a provider block.
 
-[Unreleased]: https://github.com/kingletas/terraform-aws-modules/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/kingletas/terraform-aws-modules/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/kingletas/terraform-aws-modules/releases/tag/v0.7.0
 [0.6.0]: https://github.com/kingletas/terraform-aws-modules/releases/tag/v0.6.0
 [0.5.0]: https://github.com/kingletas/terraform-aws-modules/releases/tag/v0.5.0
 [0.4.0]: https://github.com/kingletas/terraform-aws-modules/releases/tag/v0.4.0

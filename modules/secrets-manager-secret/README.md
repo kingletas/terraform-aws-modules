@@ -6,7 +6,7 @@ A secret, optionally with a first value that can be kept out of Terraform state,
 
 ```hcl
 module "api_key" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/secrets-manager-secret?ref=v0.6.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/secrets-manager-secret?ref=v0.7.0"
 
   name        = "prod/api/signing-key"
   description = "Signing key for outbound webhooks"
@@ -25,7 +25,7 @@ module "api_key" {
 
 ```hcl
 module "vendor_token" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/secrets-manager-secret?ref=v0.6.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/secrets-manager-secret?ref=v0.7.0"
 
   name                     = "prod/alerts/vendor-token"
   secret_string_wo         = var.vendor_token

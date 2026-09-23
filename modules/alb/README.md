@@ -6,7 +6,7 @@ An application load balancer with target groups, an HTTPS listener, and an optio
 
 ```hcl
 module "public" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/alb?ref=v0.6.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/alb?ref=v0.7.0"
 
   name       = "platform-public"
   vpc_id     = module.vpc.vpc_id

@@ -6,7 +6,7 @@ A managed RabbitMQ or ActiveMQ broker, private to your VPC, encrypted at rest.
 
 ```hcl
 module "broker" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/amazon-mq?ref=v0.6.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/amazon-mq?ref=v0.7.0"
 
   name           = "orders"
   engine_version = "3.13"
