@@ -1,0 +1,26 @@
+# Two of the modules whose resource keys change in 0.6.0, called in their 0.5.0 shape.
+# run.sh copies this into a disposable directory and applies it against MiniStack. transfer-server
+# is left out because MiniStack answers DescribeUser with a timestamp the provider cannot read.
+
+variable "run" {
+  type = string
+}
+
+# Endpoint and throwaway credentials come from the environment run.sh sets.
+provider "aws" {}
+
+module "parameters" {
+  source = "../../modules/ssm-parameter"
+
+  parameters = { (format("/%s/api/log-level", var.run)) = {} }
+  values     = { (format("/%s/api/log-level", var.run)) = "info" }
+}
+
+module "key" {
+  source = "../../modules/kms-key"
+
+  name                    = format("%s-app", var.run)
+  description             = "Upgrade proof"
+  deletion_window_in_days = 7
+  aliases                 = [format("%s-legacy", var.run)]
+}

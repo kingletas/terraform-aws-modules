@@ -76,6 +76,6 @@ git tag -a vX.Y.Z -m "X.Y.Z"
 git push origin vX.Y.Z
 ```
 
-**A breaking change never ships in a patch release.** Before 1.0 it bumps the minor version, and the entry opens by saying what an upgrade destroys and recreates. Run `packaging/release-notes.sh X.Y.Z` before tagging: it prints the notes, and refuses a patch version whose section lists breaking changes.
+**A breaking change never ships in a patch release.** Before 1.0 it bumps the minor version, and the entry opens by saying what an upgrade destroys and recreates. `testing/upgrade/run.sh` proves against MiniStack what an upgrade from the previous release does to live resources, with and without a `moved` block or `terraform state mv`; point its fixtures at the modules a release rekeys. Run `packaging/release-notes.sh X.Y.Z` before tagging: it prints the notes, and refuses a patch version whose section lists breaking changes.
 
 The tag starts the release workflow, which runs the same script, so a patch tag with breaking changes publishes nothing.

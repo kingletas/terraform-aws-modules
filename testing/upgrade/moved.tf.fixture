@@ -1,0 +1,11 @@
+# The moved blocks a caller writes on upgrade. @RUN@ stands for the literal environment name.
+
+moved {
+  from = module.parameters.aws_ssm_parameter.this["/@RUN@/api/log-level"]
+  to   = module.parameters.aws_ssm_parameter.this["log-level"]
+}
+
+moved {
+  from = module.key.aws_kms_alias.extra["@RUN@-legacy"]
+  to   = module.key.aws_kms_alias.extra["legacy"]
+}
