@@ -2,7 +2,7 @@
 
 A set of identically configured EC2 instances, spread round-robin across the subnets you give it.
 
-Instances are named `name-01`, `name-02` and so on, and every output is keyed by that name rather than by list position. Removing an instance therefore does not renumber the ones that remain.
+Instances are named `name-01`, `name-02` and so on, and every output is keyed by that name rather than by list position. Removing an instance therefore does not renumber the ones that remain. Each instance is addressed by its ordinal alone, `aws_instance.this["01"]`, so the address is the same in every environment and a `moved` block can name it.
 
 ## Usage
 

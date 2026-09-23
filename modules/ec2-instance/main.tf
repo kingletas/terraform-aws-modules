@@ -1,17 +1,20 @@
 locals {
+  # Keyed by the ordinal alone, so an address is a literal a moved block can name in every environment.
   instances = {
     for index in range(var.instance_count) :
-    format("%s-%02d", var.name, index + 1) => {
+    format("%02d", index + 1) => {
+      name      = format("%s-%02d", var.name, index + 1)
       subnet_id = var.subnet_ids[index % length(var.subnet_ids)]
     }
   }
 
   volume_attachments = merge([
-    for instance_name, instance in local.instances : {
+    for instance_key, instance in local.instances : {
       for volume_name, volume in var.extra_volumes :
-      format("%s-%s", instance_name, volume_name) => {
-        instance_name = instance_name
-        volume_name   = volume_name
+      format("%s-%s", instance_key, volume_name) => {
+        instance_key = instance_key
+        volume_name  = volume_name
+        name         = format("%s-%s", instance.name, volume_name)
       }
     }
   ]...)
@@ -53,7 +56,7 @@ resource "aws_instance" "this" {
     encrypted             = true
     kms_key_id            = var.kms_key_id
 
-    tags = merge(var.tags, { Name = format("%s-root", each.key) })
+    tags = merge(var.tags, { Name = format("%s-root", each.value.name) })
   }
 
   # IMDSv2 only. Token-less metadata requests are what server-side request forgery reaches.
@@ -64,7 +67,7 @@ resource "aws_instance" "this" {
     instance_metadata_tags      = var.instance_metadata_tags ? "enabled" : "disabled"
   }
 
-  tags = merge(var.tags, { Name = each.key })
+  tags = merge(var.tags, { Name = each.value.name })
 
   # Destroy-first, so an extra volume is detached from the old instance before it is attached to the new one.
   lifecycle {
@@ -81,7 +84,7 @@ resource "aws_instance" "this" {
 resource "aws_ebs_volume" "this" {
   for_each = local.volume_attachments
 
-  availability_zone = data.aws_subnet.volume[each.value.instance_name].availability_zone
+  availability_zone = data.aws_subnet.volume[each.value.instance_key].availability_zone
   size              = var.extra_volumes[each.value.volume_name].size
   type              = var.extra_volumes[each.value.volume_name].type
   iops              = contains(["gp3", "io1", "io2"], var.extra_volumes[each.value.volume_name].type) ? var.extra_volumes[each.value.volume_name].iops : null
@@ -89,7 +92,7 @@ resource "aws_ebs_volume" "this" {
   encrypted         = true
   kms_key_id        = var.kms_key_id
 
-  tags = merge(var.tags, { Name = each.key })
+  tags = merge(var.tags, { Name = each.value.name })
 }
 
 resource "aws_volume_attachment" "this" {
@@ -97,7 +100,7 @@ resource "aws_volume_attachment" "this" {
 
   device_name = var.extra_volumes[each.value.volume_name].device_name
   volume_id   = aws_ebs_volume.this[each.key].id
-  instance_id = aws_instance.this[each.value.instance_name].id
+  instance_id = aws_instance.this[each.value.instance_key].id
 
   # Detaching a mounted volume hangs unless the instance is stopped first.
   stop_instance_before_detaching = true

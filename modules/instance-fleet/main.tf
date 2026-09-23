@@ -1,12 +1,13 @@
 locals {
-  # Every instance in the fleet, flattened from roles into one map keyed by the instance name.
+  # Every instance in the fleet, keyed by role and ordinal so an address is a literal a moved block can name.
   instances = merge([
     for role_name, role in var.roles : {
       for index in range(role.count) :
-      (role.numbered
-        ? format("%s-%s-%02d", var.name, role_name, index + 1)
-        : format("%s-%s", var.name, role_name)
-        ) => {
+      (role.numbered ? format("%s-%02d", role_name, index + 1) : role_name) => {
+        name = (role.numbered
+          ? format("%s-%s-%02d", var.name, role_name, index + 1)
+          : format("%s-%s", var.name, role_name)
+        )
         role    = role_name
         ordinal = index + 1
 
@@ -45,18 +46,19 @@ locals {
   ]...)
 
   subnets_with_volumes = {
-    for name, instance in local.instances : name => instance.subnet_id if length(instance.extra_volumes) > 0
+    for key, instance in local.instances : key => instance.subnet_id if length(instance.extra_volumes) > 0
   }
 
-  elastic_ips = { for name, instance in local.instances : name => instance if instance.assign_elastic_ip }
+  elastic_ips = { for key, instance in local.instances : key => instance if instance.assign_elastic_ip }
 
   volume_attachments = merge([
-    for instance_name, instance in local.instances : {
+    for instance_key, instance in local.instances : {
       for volume_name, volume in instance.extra_volumes :
-      format("%s-%s", instance_name, volume_name) => {
-        instance_name = instance_name
-        volume_name   = volume_name
-        volume        = volume
+      format("%s-%s", instance_key, volume_name) => {
+        instance_key = instance_key
+        volume_name  = volume_name
+        name         = format("%s-%s", instance.name, volume_name)
+        volume       = volume
       }
     }
   ]...)
@@ -91,7 +93,7 @@ resource "aws_instance" "this" {
     encrypted             = true
     kms_key_id            = each.value.kms_key_id
 
-    tags = merge(var.tags, each.value.tags, { Name = format("%s-root", each.key) })
+    tags = merge(var.tags, each.value.tags, { Name = format("%s-root", each.value.name) })
   }
 
   metadata_options {
@@ -102,7 +104,7 @@ resource "aws_instance" "this" {
   }
 
   tags = merge(var.tags, each.value.tags, {
-    Name = each.key
+    Name = each.value.name
     Role = each.value.role
   })
 
@@ -125,7 +127,7 @@ resource "aws_eip" "this" {
   domain   = "vpc"
   instance = aws_instance.this[each.key].id
 
-  tags = merge(var.tags, each.value.tags, { Name = each.key })
+  tags = merge(var.tags, each.value.tags, { Name = each.value.name })
 }
 
 # A volume takes its zone from the subnet, which outlives any one instance, so replacing an instance keeps the volume.
@@ -138,15 +140,15 @@ data "aws_subnet" "volume" {
 resource "aws_ebs_volume" "this" {
   for_each = local.volume_attachments
 
-  availability_zone = data.aws_subnet.volume[each.value.instance_name].availability_zone
+  availability_zone = data.aws_subnet.volume[each.value.instance_key].availability_zone
   size              = each.value.volume.size
   type              = each.value.volume.type
   iops              = contains(["gp3", "io1", "io2"], each.value.volume.type) ? each.value.volume.iops : null
   throughput        = each.value.volume.type == "gp3" ? each.value.volume.throughput : null
   encrypted         = true
-  kms_key_id        = local.instances[each.value.instance_name].kms_key_id
+  kms_key_id        = local.instances[each.value.instance_key].kms_key_id
 
-  tags = merge(var.tags, { Name = each.key })
+  tags = merge(var.tags, { Name = each.value.name })
 }
 
 resource "aws_volume_attachment" "this" {
@@ -154,7 +156,7 @@ resource "aws_volume_attachment" "this" {
 
   device_name = each.value.volume.device_name
   volume_id   = aws_ebs_volume.this[each.key].id
-  instance_id = aws_instance.this[each.value.instance_name].id
+  instance_id = aws_instance.this[each.value.instance_key].id
 
   # Detaching a mounted volume hangs unless the instance is stopped first.
   stop_instance_before_detaching = true

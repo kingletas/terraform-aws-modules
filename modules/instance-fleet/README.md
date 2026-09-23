@@ -57,7 +57,7 @@ A role names only what differs. The bastion above states five things. Everything
 
 ## Every role is numbered
 
-Instances are named `prefix-role-01` and upward, including a role with exactly one member.
+Instances are named `prefix-role-01` and upward, including a role with exactly one member. Each is addressed by role and ordinal without the prefix, `aws_instance.this["web-01"]`, so the address is the same in every environment and a `moved` block can name it. Outputs stay keyed by the full name.
 
 **A rename in Terraform is a destroy and a create.** If a single-instance role kept a bare name, adding the second instance would rename the first, replacing a running node to make room for a new one, which is never what anybody meant by "scale up".
 
