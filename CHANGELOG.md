@@ -6,6 +6,14 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **`secrets-manager-secret`**: requires Terraform 1.11 or later and AWS provider 6.50.0 or later, for the write-only value below. Provider 6.50.0 is the first that switches an existing version from `secret_string` to `secret_string_wo` without replacing it.
+
+### Added
+
+- **`secrets-manager-secret`**: `secret_string_wo` and `secret_string_wo_version` write the secret's value as a write-only argument, so it never reaches Terraform state or a plan. Declare the variable you pass in as `ephemeral = true`. Terraform cannot see a write-only value change, so raise `secret_string_wo_version` to write a new one. It cannot be combined with `initial_version` or `generate_password`. A secret created with `initial_version` can move to `secret_string_wo` in place: remove `initial_version`, set both new inputs, and the version is updated rather than replaced. Earlier copies of the state file still hold the old value, so rotate it afterwards.
+
 ## [0.6.0] - 2026-09-23
 
 **Upgrading to 0.6.0 destroys and recreates resources.** Four modules and one example change the keys their resources are addressed by, so on the first plan after upgrading, Terraform destroys the existing resource at the old address and creates it again at the new one: SSM parameters in `ssm-parameter`, SFTP user keys in `transfer-server`, extra aliases in `kms-key`, principal associations in `transit-gateway`, and the endpoint security group rules in the `network-hub` example. Read the plan before applying. Each entry below says what to change in a call. Where the old key is a literal you can write, a `moved` block keeps the existing resource; where it is not, `terraform state mv` from the old address to the new one, run once per environment before the apply, keeps it instead.

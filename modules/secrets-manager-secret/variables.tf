@@ -20,13 +20,32 @@ variable "initial_version" {
     value = optional(string)
     json  = optional(map(string))
   })
-  description = "First version of the secret: set exactly one of value or json. Whatever is set here lands in Terraform state in clear text; prefer generate_password or writing the value out of band."
+  description = "First version of the secret: set exactly one of value or json. Whatever is set here lands in Terraform state in clear text; prefer secret_string_wo."
   default     = null
   sensitive   = true
 
   validation {
     condition     = var.initial_version == null || nonsensitive((try(var.initial_version.value, null) == null) != (try(var.initial_version.json, null) == null))
     error_message = "initial_version needs exactly one of value or json."
+  }
+}
+
+variable "secret_string_wo" {
+  type        = string
+  description = "Value written as a write-only argument, so it never reaches Terraform state or a plan. Takes effect only with secret_string_wo_version, and cannot be combined with initial_version or generate_password."
+  default     = null
+  sensitive   = true
+  ephemeral   = true
+}
+
+variable "secret_string_wo_version" {
+  type        = number
+  description = "Version of secret_string_wo. Terraform cannot see a write-only value change, so raise this number to write a new one. Null writes no write-only value."
+  default     = null
+
+  validation {
+    condition     = var.secret_string_wo_version == null || try(var.secret_string_wo_version >= 1 && floor(var.secret_string_wo_version) == var.secret_string_wo_version, false)
+    error_message = "secret_string_wo_version must be a whole number of 1 or more."
   }
 }
 

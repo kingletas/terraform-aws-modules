@@ -1,6 +1,7 @@
 locals {
   # Whether a value was supplied is not itself a secret, only the value is.
   has_initial_version = nonsensitive(var.initial_version != null) || var.generate_password
+  write_only          = var.secret_string_wo_version != null
 
   secret_string = (
     var.generate_password ? random_password.this[0].result
@@ -44,14 +45,22 @@ resource "aws_secretsmanager_secret" "this" {
       condition     = !(var.generate_password && nonsensitive(var.initial_version != null))
       error_message = "Set initial_version or generate_password, not both."
     }
+
+    precondition {
+      condition     = !(local.write_only && local.has_initial_version)
+      error_message = "Set secret_string_wo_version or one of initial_version and generate_password, not both."
+    }
   }
 }
 
 resource "aws_secretsmanager_secret_version" "this" {
-  count = local.has_initial_version ? 1 : 0
+  count = local.has_initial_version || local.write_only ? 1 : 0
 
   secret_id     = aws_secretsmanager_secret.this.id
-  secret_string = local.secret_string
+  secret_string = local.write_only ? null : local.secret_string
+
+  secret_string_wo         = local.write_only ? var.secret_string_wo : null
+  secret_string_wo_version = var.secret_string_wo_version
 
   lifecycle {
     # Rotation and out-of-band updates own the value after the first write.
