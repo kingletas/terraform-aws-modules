@@ -50,6 +50,7 @@ Each key in `trusted_oidc_providers` becomes a policy statement ID, which allows
 - `permissions_boundary_arn` caps what the role can ever be granted, however its policies change later. It is the useful control when somebody else can attach policies.
 - The role's outputs are available only once its managed and inline policies are attached, so a resource that uses the role never starts with it half granted.
 - Inline policies live and die with the role; managed policies outlive it and can be shared.
+- **Adopting a role that already exists.** AWS completes `name` with a unique suffix by default, so an existing role would be replaced. Set `use_name_prefix = false` to use `name` exactly, `instance_profile_name` for a profile named differently from the role, and `inline_policy_names` to keep an inline policy's IAM name while its key stays a literal a `moved` block can name: `inline_policies = { secrets = ... }` with `inline_policy_names = { secrets = "app-staging-sm-policy" }` is addressed as `aws_iam_role_policy.this["secrets"]` in every environment.
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements
@@ -78,7 +79,9 @@ Each key in `trusted_oidc_providers` becomes a policy statement ID, which allows
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| name | Role name prefix. | `string` | n/a | yes |
+| name | Role name prefix, or the role's exact name when use\_name\_prefix is false. | `string` | n/a | yes |
+| use\_name\_prefix | Treat name as a prefix AWS completes with a unique suffix. False names the role exactly name, which is what adopting an existing role needs. | `bool` | `true` | no |
+| instance\_profile\_name | Exact name of the instance profile. Null follows the role: a prefix from name, or exactly name when use\_name\_prefix is false. | `string` | `null` | no |
 | description | What this role is for. | `string` | `null` | no |
 | trusted\_services | AWS service principals allowed to assume the role, such as ec2.amazonaws.com. | `list(string)` | `[]` | no |
 | trusted\_role\_arns | IAM role or account ARNs allowed to assume the role. | `list(string)` | `[]` | no |
@@ -87,7 +90,8 @@ Each key in `trusted_oidc_providers` becomes a policy statement ID, which allows
 | external\_id | External ID a third party must present on assume. The defence against the confused deputy problem. | `string` | `null` | no |
 | max\_session\_duration | Longest session in seconds, between one and twelve hours. | `number` | `3600` | no |
 | managed\_policy\_arns | Managed policies to attach, keyed by a stable name. The keys must be known at plan, so a policy created in the same configuration can be attached; its ARN need not be. | `map(string)` | `{}` | no |
-| inline\_policies | Inline policy documents keyed by policy name. These live and die with the role. | `map(string)` | `{}` | no |
+| inline\_policies | Inline policy documents keyed by a stable name, which is also the policy's IAM name unless inline\_policy\_names gives another. These live and die with the role. | `map(string)` | `{}` | no |
+| inline\_policy\_names | IAM names for inline policies, keyed like inline\_policies. Lets the key stay a literal a moved block can name while the IAM name carries the environment. | `map(string)` | `{}` | no |
 | permissions\_boundary\_arn | Policy capping what this role can ever be granted, however its policies change later. | `string` | `null` | no |
 | create\_instance\_profile | Also create an instance profile, which is how an EC2 instance is given the role. | `bool` | `false` | no |
 | tags | Tags applied to every resource this module creates. | `map(string)` | `{}` | no |

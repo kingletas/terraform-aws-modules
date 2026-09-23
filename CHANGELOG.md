@@ -18,6 +18,7 @@ All notable changes to this project are recorded here. The format follows
 
 ### Added
 
+- **`iam-role`**: `use_name_prefix` (default `true`) names the role exactly `name` when set to `false`, `instance_profile_name` names the instance profile exactly, and `inline_policy_names` gives an inline policy an IAM name apart from its map key. Together they let an existing role, profile and inline policy be adopted into the module with `moved` blocks instead of being replaced. Callers that set none of them are unchanged.
 - **`secrets-manager-secret`**: `secret_string_wo` and `secret_string_wo_version` write the secret's value as a write-only argument, so it never reaches Terraform state or a plan. Declare the variable you pass in as `ephemeral = true`. Terraform cannot see a write-only value change, so raise `secret_string_wo_version` to write a new one. It cannot be combined with `initial_version` or `generate_password`. A secret created with `initial_version` can move to `secret_string_wo` in place: remove `initial_version`, set both new inputs, and the version is updated rather than replaced. Earlier copies of the state file still hold the old value, so rotate it afterwards.
 
 ## [0.6.0] - 2026-09-23

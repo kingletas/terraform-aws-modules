@@ -278,3 +278,70 @@ run "gives_every_output_once_policies_are_attached" {
     error_message = "The instance profile output should be the profile this module created."
   }
 }
+
+run "names_the_role_by_prefix_by_default" {
+  command = plan
+
+  variables {
+    trusted_services        = ["ec2.amazonaws.com"]
+    create_instance_profile = true
+  }
+
+  assert {
+    condition     = aws_iam_role.this.name_prefix == "plan-test-" && aws_iam_instance_profile.this[0].name_prefix == "plan-test-"
+    error_message = "Without use_name_prefix = false, the role and profile must keep the name as a prefix."
+  }
+}
+
+run "names_the_role_and_profile_exactly" {
+  command = plan
+
+  variables {
+    name                    = "plan-test-role"
+    use_name_prefix         = false
+    instance_profile_name   = "plan-test-profile"
+    trusted_services        = ["ec2.amazonaws.com"]
+    create_instance_profile = true
+  }
+
+  assert {
+    condition     = aws_iam_role.this.name == "plan-test-role"
+    error_message = "use_name_prefix = false must name the role exactly."
+  }
+
+  assert {
+    condition     = aws_iam_instance_profile.this[0].name == "plan-test-profile"
+    error_message = "instance_profile_name must name the profile exactly."
+  }
+}
+
+run "names_an_inline_policy_apart_from_its_key" {
+  command = plan
+
+  variables {
+    trusted_services    = ["ec2.amazonaws.com"]
+    inline_policies     = { secrets = "{\"Version\":\"2012-10-17\",\"Statement\":[]}", logs = "{\"Version\":\"2012-10-17\",\"Statement\":[]}" }
+    inline_policy_names = { secrets = "plan-test-sm-policy" }
+  }
+
+  assert {
+    condition     = aws_iam_role_policy.this["secrets"].name == "plan-test-sm-policy"
+    error_message = "inline_policy_names must set the IAM name while the key stays the address."
+  }
+
+  assert {
+    condition     = aws_iam_role_policy.this["logs"].name == "logs"
+    error_message = "A policy with no entry in inline_policy_names must keep its key as its name."
+  }
+}
+
+run "refuses_a_policy_name_with_no_policy" {
+  command = plan
+
+  variables {
+    trusted_services    = ["ec2.amazonaws.com"]
+    inline_policy_names = { missing = "plan-test-sm-policy" }
+  }
+
+  expect_failures = [var.inline_policy_names]
+}

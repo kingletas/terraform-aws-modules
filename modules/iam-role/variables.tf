@@ -1,6 +1,18 @@
 variable "name" {
   type        = string
-  description = "Role name prefix."
+  description = "Role name prefix, or the role's exact name when use_name_prefix is false."
+}
+
+variable "use_name_prefix" {
+  type        = bool
+  description = "Treat name as a prefix AWS completes with a unique suffix. False names the role exactly name, which is what adopting an existing role needs."
+  default     = true
+}
+
+variable "instance_profile_name" {
+  type        = string
+  description = "Exact name of the instance profile. Null follows the role: a prefix from name, or exactly name when use_name_prefix is false."
+  default     = null
 }
 
 variable "description" {
@@ -100,8 +112,19 @@ variable "managed_policy_arns" {
 
 variable "inline_policies" {
   type        = map(string)
-  description = "Inline policy documents keyed by policy name. These live and die with the role."
+  description = "Inline policy documents keyed by a stable name, which is also the policy's IAM name unless inline_policy_names gives another. These live and die with the role."
   default     = {}
+}
+
+variable "inline_policy_names" {
+  type        = map(string)
+  description = "IAM names for inline policies, keyed like inline_policies. Lets the key stay a literal a moved block can name while the IAM name carries the environment."
+  default     = {}
+
+  validation {
+    condition     = alltrue([for key in keys(var.inline_policy_names) : contains(keys(var.inline_policies), key)])
+    error_message = "Every key in inline_policy_names must also be a key in inline_policies."
+  }
 }
 
 variable "permissions_boundary_arn" {
