@@ -1,0 +1,64 @@
+# The modules a release rekeys, called in the previous release's shape. run.sh applies this
+# from a checkout of that release; to.tf.fixture is the same call in this release's shape.
+
+variable "run" {
+  type = string
+}
+
+# Endpoint and throwaway credentials come from the environment run.sh sets.
+provider "aws" {}
+
+resource "aws_vpc" "this" {
+  cidr_block = "10.71.0.0/16"
+}
+
+resource "aws_subnet" "this" {
+  vpc_id            = aws_vpc.this.id
+  cidr_block        = "10.71.1.0/24"
+  availability_zone = "us-east-1a"
+}
+
+module "web" {
+  source = "../../modules/ec2-instance"
+
+  name           = format("%s-web", var.run)
+  instance_count = 1
+  instance_type  = "t3.micro"
+  ami_id         = "ami-0123456789abcdef0"
+  subnet_ids     = [aws_subnet.this.id]
+  monitoring     = false
+
+  extra_volumes = {
+    data = { device_name = "/dev/sdf", size = 10 }
+  }
+}
+
+module "fleet" {
+  source = "../../modules/instance-fleet"
+
+  name = var.run
+
+  defaults = {
+    ami_id        = "ami-0123456789abcdef0"
+    instance_type = "t3.micro"
+    subnet_ids    = [aws_subnet.this.id]
+    monitoring    = false
+  }
+
+  roles = {
+    cron = {
+      assign_elastic_ip = true
+      extra_volumes = {
+        data = { device_name = "/dev/sdf", size = 10 }
+      }
+    }
+  }
+}
+
+module "secret" {
+  source = "../../modules/secrets-manager-secret"
+
+  name                    = format("%s/vendor-token", var.run)
+  recovery_window_in_days = 0
+  initial_version         = { value = format("%s-first", var.run) }
+}
