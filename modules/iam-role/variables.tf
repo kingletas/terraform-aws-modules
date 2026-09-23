@@ -1,11 +1,21 @@
 variable "name" {
   type        = string
-  description = "Role name prefix, or the role's exact name when use_name_prefix is false."
+  description = "Role name prefix, or the role's exact name when use_name_prefix is false. IAM allows 64 characters for a name and 38 for a prefix, which here includes the hyphen the module adds."
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9+=,.@_-]+$", var.name))
+    error_message = "The name may use only letters, digits and + = , . @ _ -."
+  }
+
+  validation {
+    condition     = var.use_name_prefix ? length(var.name) <= 37 : length(var.name) <= 64
+    error_message = "The name is too long: 64 characters at most as an exact name, 37 as a prefix, because the module adds a hyphen and AWS adds a 26-character suffix."
+  }
 }
 
 variable "use_name_prefix" {
   type        = bool
-  description = "Treat name as a prefix AWS completes with a unique suffix. False names the role exactly name, which is what adopting an existing role needs."
+  description = "Treat name as a prefix AWS completes with a unique suffix. False names the role exactly name, which is what adopting an existing role needs, and gives up replacing it create-before-destroy."
   default     = true
 }
 
@@ -13,6 +23,11 @@ variable "instance_profile_name" {
   type        = string
   description = "Exact name of the instance profile. Null follows the role: a prefix from name, or exactly name when use_name_prefix is false."
   default     = null
+
+  validation {
+    condition     = var.instance_profile_name == null || can(regex("^[A-Za-z0-9+=,.@_-]{1,128}$", var.instance_profile_name))
+    error_message = "The instance profile name must be 1 to 128 letters, digits or + = , . @ _ -."
+  }
 }
 
 variable "description" {
@@ -122,8 +137,8 @@ variable "inline_policy_names" {
   default     = {}
 
   validation {
-    condition     = alltrue([for key in keys(var.inline_policy_names) : contains(keys(var.inline_policies), key)])
-    error_message = "Every key in inline_policy_names must also be a key in inline_policies."
+    condition     = length(setsubtract(keys(var.inline_policy_names), keys(var.inline_policies))) == 0
+    error_message = format("inline_policy_names names a policy that inline_policies does not have: %s.", join(", ", sort(setsubtract(keys(var.inline_policy_names), keys(var.inline_policies)))))
   }
 }
 

@@ -51,6 +51,8 @@ Each key in `trusted_oidc_providers` becomes a policy statement ID, which allows
 - The role's outputs are available only once its managed and inline policies are attached, so a resource that uses the role never starts with it half granted.
 - Inline policies live and die with the role; managed policies outlive it and can be shared.
 - **Adopting a role that already exists.** AWS completes `name` with a unique suffix by default, so an existing role would be replaced. Set `use_name_prefix = false` to use `name` exactly, `instance_profile_name` for a profile named differently from the role, and `inline_policy_names` to keep an inline policy's IAM name while its key stays a literal a `moved` block can name: `inline_policies = { secrets = ... }` with `inline_policy_names = { secrets = "app-staging-sm-policy" }` is addressed as `aws_iam_role_policy.this["secrets"]` in every environment.
+- **An exact name has two costs, because IAM names are unique in an account.** Any replacement leaves a short window with no role, since the new one cannot exist beside the old; the module has always replaced destroy-first, so this is not new, but anything depending on the role that sets `create_before_destroy` passes it on and the replacement then fails on the taken name. And two callers using the same exact name in one account collide. The prefix stays the default for new roles; set `use_name_prefix = false` only to adopt a role whose name must stay.
+- **Adopting adds the module's own touches in place.** Moving an existing role in plans an update, not a replacement: the role and the instance profile gain a `Name` tag (the role's `name`, on both), and the trust policy's statement gains the ID `TrustServices`. What the policy allows does not change.
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements
@@ -79,8 +81,8 @@ Each key in `trusted_oidc_providers` becomes a policy statement ID, which allows
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| name | Role name prefix, or the role's exact name when use\_name\_prefix is false. | `string` | n/a | yes |
-| use\_name\_prefix | Treat name as a prefix AWS completes with a unique suffix. False names the role exactly name, which is what adopting an existing role needs. | `bool` | `true` | no |
+| name | Role name prefix, or the role's exact name when use\_name\_prefix is false. IAM allows 64 characters for a name and 38 for a prefix, which here includes the hyphen the module adds. | `string` | n/a | yes |
+| use\_name\_prefix | Treat name as a prefix AWS completes with a unique suffix. False names the role exactly name, which is what adopting an existing role needs, and gives up replacing it create-before-destroy. | `bool` | `true` | no |
 | instance\_profile\_name | Exact name of the instance profile. Null follows the role: a prefix from name, or exactly name when use\_name\_prefix is false. | `string` | `null` | no |
 | description | What this role is for. | `string` | `null` | no |
 | trusted\_services | AWS service principals allowed to assume the role, such as ec2.amazonaws.com. | `list(string)` | `[]` | no |

@@ -345,3 +345,79 @@ run "refuses_a_policy_name_with_no_policy" {
 
   expect_failures = [var.inline_policy_names]
 }
+
+run "refuses_an_exact_name_longer_than_iam_allows" {
+  command = plan
+
+  variables {
+    name             = "plan-test-a-role-name-that-runs-well-past-the-sixty-four-char-limit"
+    use_name_prefix  = false
+    trusted_services = ["ec2.amazonaws.com"]
+  }
+
+  expect_failures = [var.name]
+}
+
+run "refuses_a_prefix_that_leaves_no_room_for_the_suffix" {
+  command = plan
+
+  variables {
+    name             = "plan-test-prefix-of-thirty-eight-chars"
+    trusted_services = ["ec2.amazonaws.com"]
+  }
+
+  expect_failures = [var.name]
+}
+
+run "accepts_an_exact_name_of_sixty_four_characters" {
+  command = plan
+
+  variables {
+    name             = "plan-test-role-name-exactly-sixty-four-characters-long-abcdefghi"
+    use_name_prefix  = false
+    trusted_services = ["ec2.amazonaws.com"]
+  }
+
+  assert {
+    condition     = aws_iam_role.this.name == var.name
+    error_message = "A 64-character exact name is the IAM maximum and must be accepted."
+  }
+}
+
+run "refuses_an_instance_profile_name_longer_than_iam_allows" {
+  command = plan
+
+  variables {
+    instance_profile_name   = join("", [for i in range(129) : "p"])
+    trusted_services        = ["ec2.amazonaws.com"]
+    create_instance_profile = true
+  }
+
+  expect_failures = [var.instance_profile_name]
+}
+
+run "names_the_policy_key_that_has_no_policy" {
+  command = plan
+
+  variables {
+    trusted_services    = ["ec2.amazonaws.com"]
+    inline_policies     = { logs = "{\"Version\":\"2012-10-17\",\"Statement\":[]}" }
+    inline_policy_names = { secrets = "plan-test-sm-policy", logs = "plan-test-logs" }
+  }
+
+  expect_failures = [var.inline_policy_names]
+}
+
+run "accepts_a_prefix_of_thirty_seven_characters" {
+  command = plan
+
+  variables {
+    name             = "plan-test-prefix-of-37-characters-abc"
+    trusted_services = ["ec2.amazonaws.com"]
+  }
+
+  assert {
+    condition     = aws_iam_role.this.name_prefix == format("%s-", var.name)
+    error_message = "A 37-character prefix, 38 with the hyphen, is the IAM maximum and must be accepted."
+  }
+}
