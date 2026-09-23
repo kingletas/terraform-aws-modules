@@ -6,7 +6,7 @@ A network load balancer, for TCP and TLS traffic that an application load balanc
 
 ```hcl
 module "internal" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/nlb?ref=v0.5.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/nlb?ref=v0.6.0"
 
   name       = "platform-internal"
   vpc_id     = module.vpc.vpc_id

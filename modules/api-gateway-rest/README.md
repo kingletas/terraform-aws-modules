@@ -6,7 +6,7 @@ A REST API with a deployed stage, access logging, throttling and X-Ray tracing.
 
 ```hcl
 module "api" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/api-gateway-rest?ref=v0.5.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/api-gateway-rest?ref=v0.6.0"
 
   name       = "platform-api"
   stage_name = "v1"

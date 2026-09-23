@@ -6,7 +6,7 @@ A multi-region trail with log file validation, which is the record of who did wh
 
 ```hcl
 module "trail" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/cloudtrail-trail?ref=v0.5.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/cloudtrail-trail?ref=v0.6.0"
 
   name           = "platform-audit"
   s3_bucket_name = module.audit_logs.id

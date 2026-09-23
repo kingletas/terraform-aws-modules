@@ -6,7 +6,7 @@ Publishes what Ansible needs to configure the infrastructure Terraform just buil
 
 ```hcl
 module "ansible" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/ansible-inventory?ref=v0.5.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/ansible-inventory?ref=v0.6.0"
 
   name       = "storefront-production"
   output_dir = "${path.module}/ansible"

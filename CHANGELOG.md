@@ -6,6 +6,10 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-23
+
+**Upgrading to 0.6.0 destroys and recreates resources.** Four modules and one example change the keys their resources are addressed by, so on the first plan after upgrading, Terraform destroys the existing resource at the old address and creates it again at the new one: SSM parameters in `ssm-parameter`, SFTP user keys in `transfer-server`, extra aliases in `kms-key`, principal associations in `transit-gateway`, and the endpoint security group rules in the `network-hub` example. Read the plan before applying. Each entry below says what to change in a call. Where the old key is a literal you can write, a `moved` block keeps the existing resource; where it is not, `terraform state mv` from the old address to the new one, run once per environment before the apply, keeps it instead.
+
 ### Breaking changes
 
 - **`ssm-parameter`**: `parameters` and `values` are keyed by a short name under the new `path_prefix` instead of by the full path. Move the computed part of each path into `path_prefix` and leave the key a literal: `path_prefix = format("/%s/api", var.environment)` with `parameters = { "log-level" = {} }` writes `/staging/api/log-level` as before. A key may still contain slashes, so one call can cover a subtree. `arns`, `names` and `versions` are keyed by that name, and `names` now gives the full path as its value, which is what an application reads the parameter by; a caller that looked a path up in `names` should ask for the short name instead. Existing parameters are destroyed and recreated at the same paths on upgrade, because the resource address changes. The reason for the change is that a `moved` block may only name an address with a constant key, so a path built from a variable could not be written as one, and an existing parameter could not be adopted into the module without being replaced.
@@ -186,7 +190,8 @@ The first release.
 - Encryption is on, public addresses are off and IMDSv2 is required, each with a variable to choose otherwise deliberately.
 - No module carries a provider block.
 
-[Unreleased]: https://github.com/kingletas/terraform-aws-modules/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/kingletas/terraform-aws-modules/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/kingletas/terraform-aws-modules/releases/tag/v0.6.0
 [0.5.0]: https://github.com/kingletas/terraform-aws-modules/releases/tag/v0.5.0
 [0.4.0]: https://github.com/kingletas/terraform-aws-modules/releases/tag/v0.4.0
 [0.3.0]: https://github.com/kingletas/terraform-aws-modules/releases/tag/v0.3.0

@@ -6,7 +6,7 @@ A verified sending domain: DKIM, a custom envelope sender, a configuration set, 
 
 ```hcl
 module "mail" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/ses-domain?ref=v0.5.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/ses-domain?ref=v0.6.0"
 
   domain              = "example.com"
   mail_from_subdomain = "mail"

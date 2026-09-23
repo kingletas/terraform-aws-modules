@@ -6,7 +6,7 @@ A certificate, its DNS validation records, and a wait for issuance.
 
 ```hcl
 module "certificate" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/acm-certificate?ref=v0.5.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/acm-certificate?ref=v0.6.0"
 
   domain_name               = "example.com"
   subject_alternative_names = ["*.example.com"]

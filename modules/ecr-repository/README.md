@@ -6,7 +6,7 @@ A container registry with immutable tags and a lifecycle policy, so old images d
 
 ```hcl
 module "api_image" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/ecr-repository?ref=v0.5.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/ecr-repository?ref=v0.6.0"
 
   name                       = "platform/api"
   untagged_image_expiry_days = 7

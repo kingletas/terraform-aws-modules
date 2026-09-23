@@ -8,7 +8,7 @@ This module creates no resources. It only computes values, so every stack that u
 
 ```hcl
 module "context" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/context?ref=v0.5.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/context?ref=v0.6.0"
 
   project     = "storefront"
   environment = "production"
@@ -17,7 +17,7 @@ module "context" {
 }
 
 module "database" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/aurora-cluster?ref=v0.5.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/aurora-cluster?ref=v0.6.0"
 
   name       = module.context.prefix
   subnet_ids = values(module.vpc.private_subnet_ids)

@@ -8,7 +8,7 @@ Apply it once per account and region, not once per stack.
 
 ```hcl
 module "account_defaults" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/account-defaults?ref=v0.5.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/account-defaults?ref=v0.6.0"
 
   ebs_encryption_by_default = true
   block_s3_public_access    = true

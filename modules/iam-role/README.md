@@ -6,7 +6,7 @@ A role, its trust policy and its attachments, covering service, cross-account an
 
 ```hcl
 module "task_role" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/iam-role?ref=v0.5.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/iam-role?ref=v0.6.0"
 
   name             = "platform-api-task"
   description      = "Application code for the API service"
@@ -24,7 +24,7 @@ An OIDC trust is how a CI workflow gets credentials with nothing stored in the r
 
 ```hcl
 module "deploy_role" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/iam-role?ref=v0.5.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/iam-role?ref=v0.6.0"
 
   name = "platform-deploy"
 

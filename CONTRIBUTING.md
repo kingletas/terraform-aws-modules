@@ -76,4 +76,6 @@ git tag -a vX.Y.Z -m "X.Y.Z"
 git push origin vX.Y.Z
 ```
 
-The tag starts the release workflow, which checks the changelog has a section for that version and publishes it as the release notes.
+**A breaking change never ships in a patch release.** Before 1.0 it bumps the minor version, and the entry opens by saying what an upgrade destroys and recreates. Run `packaging/release-notes.sh X.Y.Z` before tagging: it prints the notes, and refuses a patch version whose section lists breaking changes.
+
+The tag starts the release workflow, which runs the same script, so a patch tag with breaking changes publishes nothing.

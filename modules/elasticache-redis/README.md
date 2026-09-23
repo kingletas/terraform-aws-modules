@@ -6,7 +6,7 @@ A Valkey or Redis replication group, encrypted in flight and at rest, with failo
 
 ```hcl
 module "cache" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/elasticache-redis?ref=v0.5.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/elasticache-redis?ref=v0.6.0"
 
   name       = "platform-cache"
   node_type  = "cache.r7g.large"

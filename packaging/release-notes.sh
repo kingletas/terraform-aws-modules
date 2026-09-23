@@ -13,7 +13,7 @@
 # reads while writing is the one that goes stale.
 #
 # Exits 1 when the version has no section, so a release cannot ship with an
-# empty body.
+# empty body, and when a patch version's section lists breaking changes.
 
 set -euo pipefail
 
@@ -51,6 +51,13 @@ notes="$(printf '%s\n' "$notes" | sed -e '/./,$!d' -e ':a' -e '/^\n*$/{$d;N;ba' 
 
 if [ -z "$notes" ]; then
   echo "release-notes.sh: no section for $VERSION in $CHANGELOG" >&2
+  exit 1
+fi
+
+# A patch release promises nothing a caller wrote has to change, so breaking changes need at least a minor bump.
+patch="${VERSION##*.}"
+if [ "$patch" != "0" ] && printf '%s\n' "$notes" | grep -qiE '^#+[[:space:]]*breaking'; then
+  echo "release-notes.sh: $VERSION is a patch release but its section lists breaking changes; release it as a minor version" >&2
   exit 1
 fi
 

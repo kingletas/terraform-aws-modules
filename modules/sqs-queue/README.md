@@ -6,7 +6,7 @@ A queue and its dead letter queue, because a queue without one redelivers a pois
 
 ```hcl
 module "orders" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/sqs-queue?ref=v0.5.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/sqs-queue?ref=v0.6.0"
 
   name                       = "order-events"
   visibility_timeout_seconds = 300

@@ -6,7 +6,7 @@ A state machine with logging and X-Ray tracing, for orchestrating work that a si
 
 ```hcl
 module "order_flow" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/step-function?ref=v0.5.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/step-function?ref=v0.6.0"
 
   name     = "order-fulfilment"
   role_arn = module.order_flow_role.arn

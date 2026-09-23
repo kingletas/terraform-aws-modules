@@ -122,7 +122,7 @@ Point `source` at a module in this repository and pin a release with `?ref=`:
 
 ```hcl
 module "vpc" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/vpc?ref=v0.5.0"
+  source = "github.com/kingletas/terraform-aws-modules//modules/vpc?ref=v0.6.0"
 
   name               = "platform"
   cidr_block         = "10.0.0.0/16"
@@ -148,13 +148,13 @@ A tag is the readable choice. A commit SHA is the stronger one, because a tag ca
 
 ```hcl
 module "vpc" {
-  source = "github.com/kingletas/terraform-aws-modules//modules/vpc?ref=<commit-sha>" # v0.5.0
+  source = "github.com/kingletas/terraform-aws-modules//modules/vpc?ref=<commit-sha>" # v0.6.0
 
   # ...
 }
 ```
 
-Replace `<commit-sha>` with the full 40-character commit SHA. `git ls-remote --tags https://github.com/kingletas/terraform-aws-modules.git` lists it on the line ending `refs/tags/v0.5.0^{}`, which is the commit the tag points to.
+Replace `<commit-sha>` with the full 40-character commit SHA. `git ls-remote --tags https://github.com/kingletas/terraform-aws-modules.git` lists it on the line ending `refs/tags/v0.6.0^{}`, which is the commit the tag points to.
 
 ## Requirements
 
