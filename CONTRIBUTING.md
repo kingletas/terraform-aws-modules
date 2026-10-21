@@ -35,6 +35,10 @@ A good module test also checks the direction that refuses: a `run` block with `e
 
 If a plan test needs a value only AWS would know, like a certificate's validation records or a realistic ARN, state it with an `override_resource` and `override_during = plan`. Shared mock values live in `testing/mocks/`. Keep mock values plainly fake: a string shaped like a private key is refused by secret scanners, even in a test.
 
+### What review refuses
+
+Reviewers refuse a second module that covers an idea an existing module already covers, and improve the existing one instead. A module that demonstrates something no other module does earns its place even when nothing here needs it yet: the library is built wide because it feeds a catalog. Open questions are answered with best practice, never with a variant that lets both options live. An example is finished or it is not written: one complete Magento example beats a full one and a minimal one, and each example says what it deliberately does not do.
+
 ## What the modules agree on
 
 Follow these so the next module behaves like the last one:
